@@ -1,0 +1,9 @@
+/* Tailwind directives */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom CSS */
+.select2-container {
+    width: 100% !important;
+}

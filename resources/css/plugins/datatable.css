@@ -1,0 +1,15 @@
+.dataTables_wrapper {
+    @apply text-sm;
+}
+
+.dataTables_filter input {
+    @apply border rounded px-2 py-1;
+}
+
+.dataTables_paginate .paginate_button {
+    @apply px-3 py-1 mx-1 border rounded cursor-pointer;
+}
+
+table.dataTable {
+    @apply w-full border border-gray-200;
+}

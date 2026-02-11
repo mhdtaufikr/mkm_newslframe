@@ -1,0 +1,3 @@
+.swal2-popup {
+    @apply rounded-lg text-sm;
+}
