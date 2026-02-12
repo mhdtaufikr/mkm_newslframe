@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Login - Base App')
+@section('title', 'Login - Digital Checksheet SL-Frame')
 
 @section('content')
 <div class="page-fade min-h-screen flex items-center justify-center p-6 relative overflow-hidden">
@@ -10,24 +10,27 @@
     <div class="w-full max-w-md z-10">
         <!-- Logo Header -->
         <div class="flex items-center justify-center gap-6 mb-12">
-            <div class="h-16 w-16 bg-app-gradient rounded-2xl flex items-center justify-center shadow-lg shadow-slate-900/20">
-                <span class="text-white font-black text-3xl">B</span>
+            <div class="h-16 w-16 bg-white rounded-2xl flex items-center justify-center shadow-lg shadow-slate-900/20 p-2 border border-slate-200">
+                <img src="{{ asset('images/logo-mkm.png') }}"
+                    alt="MKM Logo"
+                    class="w-full h-full object-contain">
             </div>
             <div class="flex flex-col">
                 <h1 class="text-4xl font-extrabold tracking-tighter text-slate-800 leading-none">
-                    Base<span class="text-[var(--app-primary)]"> App</span>
+                    Digital<span class="text-[var(--app-primary)]"> Checksheet</span>
                 </h1>
                 <span class="text-[8px] font-black uppercase tracking-[0.3em] text-slate-400 mt-1">
-                    Management System
+                    SL-Frame Quality System
                 </span>
             </div>
         </div>
+
 
         <!-- Login Card -->
         <div class="glass-card p-10 rounded-[3rem] shadow-2xl shadow-slate-200">
             <div class="mb-8">
                 <h2 class="text-xl font-bold text-slate-800">Selamat Datang</h2>
-                <p class="text-slate-500 text-sm font-medium">Silakan masuk untuk mengakses aplikasi</p>
+                <p class="text-slate-500 text-sm font-medium">Silakan masuk untuk mengakses sistem quality checksheet</p>
             </div>
 
             <!-- Error Messages -->
@@ -140,7 +143,7 @@
 
         <!-- Footer -->
         <p class="mt-12 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-            © 2026 Base Application
+            © 2026 Digital Checksheet SL-Frame
         </p>
     </div>
 </div>
