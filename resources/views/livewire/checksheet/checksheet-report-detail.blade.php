@@ -88,71 +88,116 @@
                             </div>
                         </div>
 
-                        <!-- Results Table -->
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-sm">
-                                <thead>
-                                    <tr class="bg-slate-50 border-b border-slate-200">
-                                        <th class="px-3 py-2 text-center text-xs font-bold text-slate-700 uppercase w-12">NO</th>
-                                        <th class="px-3 py-2 text-left text-xs font-bold text-slate-700 uppercase">ITEM CHECK</th>
-                                        <th class="px-3 py-2 text-left text-xs font-bold text-slate-700 uppercase">Q-POINT</th>
-                                        <th class="px-3 py-2 text-center text-xs font-bold text-slate-700 uppercase w-24">RESULT</th>
-                                        <th class="px-3 py-2 text-left text-xs font-bold text-slate-700 uppercase">STATUS / REMARKS</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-slate-100">
-                                    @foreach($results as $index => $result)
-                                        <tr class="hover:bg-slate-50 transition-colors">
-                                            <!-- No -->
-                                            <td class="px-3 py-2 text-center">
-                                                <span class="font-bold text-slate-700">{{ $index + 1 }}</span>
-                                            </td>
+                      <!-- Results Table -->
+<div class="overflow-x-auto">
+    <table class="w-full text-sm">
+        <thead>
+            @if($isWelding)
+                <tr class="bg-slate-50 border-b border-slate-200">
+                    <th class="px-3 py-2 text-center text-xs font-bold text-slate-700 uppercase w-12" rowspan="2">NO</th>
+                    <th class="px-3 py-2 text-left text-xs font-bold text-slate-700 uppercase" rowspan="2">ITEM CHECK</th>
+                    <th class="px-3 py-2 text-left text-xs font-bold text-slate-700 uppercase" rowspan="2">Q-POINT</th>
+                    <th class="px-3 py-2 text-center text-xs font-bold text-slate-700 uppercase w-20" rowspan="2">RESULT</th>
+                    <th class="px-3 py-2 text-center text-xs font-bold text-red-600 uppercase" colspan="{{ count($weldingNgTypes) }}">WELDING NG BREAKDOWN</th>
+                    <th class="px-3 py-2 text-left text-xs font-bold text-slate-700 uppercase" rowspan="2">STATUS / REMARKS</th>
+                </tr>
+                <tr class="bg-slate-50 border-b border-slate-200">
+                    @foreach($weldingNgTypes as $ngType)
+                        <th class="px-3 py-2 text-center text-xs font-bold text-red-600 uppercase w-20">
+                            {{ strtoupper($ngType) }}
+                        </th>
+                    @endforeach
+                </tr>
+            @else
+                <tr class="bg-slate-50 border-b border-slate-200">
+                    <th class="px-3 py-2 text-center text-xs font-bold text-slate-700 uppercase w-12">NO</th>
+                    <th class="px-3 py-2 text-left text-xs font-bold text-slate-700 uppercase">ITEM CHECK</th>
+                    <th class="px-3 py-2 text-left text-xs font-bold text-slate-700 uppercase">Q-POINT</th>
+                    <th class="px-3 py-2 text-center text-xs font-bold text-slate-700 uppercase w-24">RESULT</th>
+                    <th class="px-3 py-2 text-left text-xs font-bold text-slate-700 uppercase">STATUS / REMARKS</th>
+                </tr>
+            @endif
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+            @foreach($results as $index => $result)
+                @php
+                    $resultData  = $result->result_data ? json_decode($result->result_data, true) : null;
+                    $ngBreakdown = $resultData['ng_breakdown'] ?? [];
+                    $ngTotal     = $resultData['ng_total'] ?? 0;
+                @endphp
+                <tr class="hover:bg-slate-50 transition-colors {{ $result->result === 'ng' ? 'bg-red-50/50' : '' }}">
 
-                                            <!-- Item Check -->
-                                            <td class="px-3 py-2">
-                                                <div>
-                                                    <p class="font-semibold text-slate-800">{{ $result->detail->item_name }}</p>
-                                                    @if($result->detail->item_code)
-                                                        <span class="text-xs text-slate-500">{{ $result->detail->item_code }}</span>
-                                                    @endif
-                                                </div>
-                                            </td>
+                    <!-- No -->
+                    <td class="px-3 py-2 text-center">
+                        <span class="font-bold text-slate-700">{{ $index + 1 }}</span>
+                    </td>
 
-                                            <!-- Q-Point -->
-                                            <td class="px-3 py-2">
-                                                @if($result->detail->qpoint_name)
-                                                    <p class="text-sm text-slate-700">{{ $result->detail->qpoint_name }}</p>
-                                                @else
-                                                    <span class="text-slate-400">-</span>
-                                                @endif
-                                            </td>
-
-                                            <!-- Result -->
-                                            <td class="px-3 py-2 text-center">
-                                                @if($result->result === 'ok')
-                                                    <span class="inline-flex items-center px-3 py-1 bg-green-100 text-green-700 rounded-lg text-xs font-bold">
-                                                        ✓ OK
-                                                    </span>
-                                                @elseif($result->result === 'ng')
-                                                    <span class="inline-flex items-center px-3 py-1 bg-red-100 text-red-700 rounded-lg text-xs font-bold">
-                                                        ✗ NG
-                                                    </span>
-                                                @endif
-                                            </td>
-
-                                            <!-- Status / Remarks -->
-                                            <td class="px-3 py-2">
-                                                @if($result->status)
-                                                    <p class="text-sm text-slate-700">{{ $result->status }}</p>
-                                                @else
-                                                    <span class="text-slate-400">-</span>
-                                                @endif
-                                            </td>
-                                        </tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
+                    <!-- Item Check -->
+                    <td class="px-3 py-2">
+                        <div>
+                            <p class="font-semibold text-slate-800">{{ $result->detail->item_name }}</p>
+                            @if($result->detail->item_code)
+                                <span class="text-xs text-slate-500">{{ $result->detail->item_code }}</span>
+                            @endif
                         </div>
+                    </td>
+
+                    <!-- Q-Point -->
+                    <td class="px-3 py-2">
+                        @if($result->detail->qpoint_name)
+                            <p class="text-sm text-slate-700">{{ $result->detail->qpoint_name }}</p>
+                        @else
+                            <span class="text-slate-400">-</span>
+                        @endif
+                    </td>
+
+                    <!-- Result -->
+                    <td class="px-3 py-2 text-center">
+                        @if($result->result === 'ok')
+                            <span class="inline-flex items-center px-3 py-1 bg-green-100 text-green-700 rounded-lg text-xs font-bold">
+                                ✓ OK
+                            </span>
+                        @elseif($result->result === 'ng')
+                            <span class="inline-flex flex-col items-center px-3 py-1 bg-red-100 text-red-700 rounded-lg text-xs font-bold">
+                                ✗ NG
+                                @if($isWelding && $ngTotal > 0)
+                                    <span class="text-red-500 font-normal mt-0.5">{{ $ngTotal }} defect</span>
+                                @endif
+                            </span>
+                        @endif
+                    </td>
+
+                    <!-- NG Breakdown (welding only) -->
+                    @if($isWelding)
+                        @foreach($weldingNgTypes as $ngType)
+                            @php $val = $ngBreakdown[$ngType] ?? 0; @endphp
+                            <td class="px-3 py-2 text-center">
+                                @if($val > 0)
+                                    <span class="inline-flex items-center justify-center min-w-[2rem] px-2 py-1 bg-red-100 text-red-700 rounded font-bold text-sm">
+                                        {{ $val }}
+                                    </span>
+                                @else
+                                    <span class="text-slate-300 text-sm">-</span>
+                                @endif
+                            </td>
+                        @endforeach
+                    @endif
+
+                    <!-- Status / Remarks -->
+                    <td class="px-3 py-2">
+                        @if($result->status)
+                            <p class="text-sm text-slate-700">{{ $result->status }}</p>
+                        @else
+                            <span class="text-slate-400">-</span>
+                        @endif
+                    </td>
+
+                </tr>
+            @endforeach
+        </tbody>
+    </table>
+</div>
+
                     </div>
                 @endforeach
             </div>
