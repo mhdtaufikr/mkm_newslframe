@@ -5,12 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Digital Checksheet SL-Frame - Quality Management System')</title>
-    <!-- Alpine.js -->
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-    <script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/collapse@3.x.x/dist/cdn.min.js"></script>
+
+    {{-- ✅ Livewire styles (include Alpine internally) --}}
+    @livewireStyles
+
+    {{-- ❌ REMOVED: Alpine CDN manual (conflict dengan Livewire's Alpine) --}}
+    {{-- <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script> --}}
+    {{-- <script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/collapse@3.x.x/dist/cdn.min.js"></script> --}}
+
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
     <style>
         :root {
             --app-primary: #475569;
@@ -339,6 +345,9 @@
             to { transform: rotate(360deg); }
         }
 
+        /* ✅ x-cloak — sembunyikan Alpine element sebelum init */
+        [x-cloak] { display: none !important; }
+
         /* 📱 Responsive */
         @media (max-width: 640px) {
             .loading-logo-container { padding: 40px 30px; border-radius: 20px; }
@@ -353,6 +362,7 @@
     @stack('styles')
 </head>
 <body class="text-slate-900 overflow-x-hidden">
+
     <!-- 🎨 Animated Background Blobs (Gray) -->
     <div class="blob blob-1"></div>
     <div class="blob blob-2"></div>
@@ -375,25 +385,18 @@
 
         <!-- Main Loading Content -->
         <div class="loading-logo-container">
-            <!-- Animated Logo -->
             <div class="loading-logo">
                 <svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
             </div>
-
-            <!-- Loading Text -->
             <h1 class="loading-text">Digital Checksheet SL-Frame</h1>
             <p class="loading-subtext">Loading Quality System...</p>
-
-            <!-- Animated Dots -->
             <div class="loading-dots">
                 <div class="dot"></div>
                 <div class="dot"></div>
                 <div class="dot"></div>
             </div>
-
-            <!-- Progress Bar -->
             <div class="loading-progress">
                 <div class="loading-progress-bar"></div>
             </div>
@@ -477,6 +480,12 @@
             return div;
         }
     </script>
+
+    {{-- ✅ Livewire scripts — Alpine sudah termasuk di dalamnya, $wire tersedia --}}
+    @livewireScripts
+
+    {{-- ✅ Alpine collapse plugin — load SETELAH livewireScripts agar register ke Alpine instance Livewire --}}
+    <script src="https://cdn.jsdelivr.net/npm/@alpinejs/collapse@3.x.x/dist/cdn.min.js"></script>
 
     @stack('scripts')
 </body>

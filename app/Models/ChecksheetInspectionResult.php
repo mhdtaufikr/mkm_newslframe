@@ -14,6 +14,7 @@ class ChecksheetInspectionResult extends Model
         'checksheet_section_id',
         'checksheet_detail_id',
         'result',
+        'result_data',
         'status',
     ];
 

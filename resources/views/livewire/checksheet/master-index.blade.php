@@ -13,12 +13,99 @@
                     <p class="text-sm text-slate-500 font-medium">Kelola data master checksheet quality</p>
                 </div>
             </div>
-            <button wire:click="createHead"
-                    class="px-5 py-2.5 bg-app-gradient text-white rounded-xl font-bold text-sm hover:shadow-xl hover:scale-105 active:scale-95 transition-all">
-                + Tambah Checksheet
-            </button>
+
+            {{-- ✅ Button group --}}
+            <div class="flex items-center gap-3">
+
+                {{-- Serial No Button --}}
+                <button wire:click="openSerialModal"
+                        class="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl font-semibold text-sm hover:bg-slate-50 hover:border-slate-300 hover:shadow transition-all">
+                    <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 8.25h15m-16.5 7.5h15m-1.8-13.5-3.9 19.5m-2.1-19.5-3.9 19.5" />
+                    </svg>
+                    <span>Starting Serial No</span>
+                    @if($currentSerialNo)
+                        <span class="px-2 py-0.5 bg-slate-100 text-slate-600 rounded-lg text-xs font-mono font-bold">
+                            {{ $currentSerialNo }}
+                        </span>
+                    @endif
+                </button>
+
+                {{-- Tambah Checksheet Button --}}
+                <button wire:click="createHead"
+                        class="px-5 py-2.5 bg-app-gradient text-white rounded-xl font-bold text-sm hover:shadow-xl hover:scale-105 active:scale-95 transition-all">
+                    + Tambah Checksheet
+                </button>
+            </div>
         </div>
     </header>
+{{-- ✅ Modal Starting Serial No --}}
+@if($showSerialModal)
+<div class="fixed inset-0 z-50 flex items-center justify-center p-4"
+     wire:keydown.escape="closeSerialModal">
+
+    {{-- Backdrop --}}
+    <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+         wire:click="closeSerialModal"></div>
+
+    {{-- Modal Card --}}
+    <div class="relative w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden">
+
+        {{-- Header --}}
+        <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center">
+                    <svg class="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 8.25h15m-16.5 7.5h15m-1.8-13.5-3.9 19.5m-2.1-19.5-3.9 19.5" />
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-base font-bold text-slate-800">Starting Serial Number</h3>
+                    <p class="text-xs text-slate-500">Atur nomor awal serial number inspeksi</p>
+                </div>
+            </div>
+            <button wire:click="closeSerialModal"
+                    class="w-8 h-8 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 flex items-center justify-center transition-all">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+
+        {{-- Body --}}
+        <div class="px-6 py-5">
+            <label class="block text-xs font-bold text-slate-600 uppercase mb-1.5">
+                Starting Serial No
+            </label>
+            <input type="text"
+                   wire:model.defer="startingSerialNo"
+                   wire:keydown.enter="saveSerialNo"
+                   placeholder="Contoh: SN-00001"
+                   class="w-full px-3 py-2.5 rounded-xl border border-slate-300 focus:border-slate-500 focus:ring-2 focus:ring-slate-200 transition-all outline-none text-sm font-mono">
+            @error('startingSerialNo')
+                <p class="mt-1.5 text-xs text-red-500 font-semibold">{{ $message }}</p>
+            @enderror
+
+            <p class="mt-2 text-xs text-slate-400">
+                Nilai ini akan digunakan sebagai referensi awal penomoran serial inspeksi.
+            </p>
+        </div>
+
+        {{-- Footer --}}
+        <div class="flex items-center justify-end gap-3 px-6 py-4 bg-slate-50 border-t border-slate-100">
+            <button wire:click="closeSerialModal"
+                    class="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-semibold text-sm hover:bg-slate-100 transition-all">
+                Batal
+            </button>
+            <button wire:click="saveSerialNo"
+                    class="px-5 py-2 bg-app-gradient text-white rounded-xl font-bold text-sm hover:shadow-lg hover:scale-105 active:scale-95 transition-all">
+                Simpan
+            </button>
+        </div>
+    </div>
+</div>
+@endif
+
 
     <main class="max-w-7xl mx-auto px-6 py-8">
         <!-- Alert Success -->

@@ -8,7 +8,9 @@ use Livewire\WithFileUploads;
 use App\Models\ChecksheetHead;
 use App\Models\ChecksheetSection;
 use App\Models\ChecksheetDetail;
+use App\Models\Rule;
 use Illuminate\Support\Facades\DB;
+
 
 class MasterIndex extends Component
 {
@@ -69,6 +71,41 @@ class MasterIndex extends Component
     public $expandedSections = [];
 
     protected $queryString = ['search'];
+// Modal state
+public bool $showSerialModal = false;
+public string $startingSerialNo = '';
+
+public function openSerialModal(): void
+{
+    // Load nilai yang sudah ada jika pernah disimpan
+    $existing = Rule::where('rule_name', 'starting_serial_no')->first();
+    $this->startingSerialNo = $existing?->rule_value ?? '';
+    $this->showSerialModal = true;
+}
+
+public function closeSerialModal(): void
+{
+    $this->showSerialModal = false;
+    $this->reset('startingSerialNo');
+}
+
+public function saveSerialNo(): void
+{
+    $this->validate([
+        'startingSerialNo' => 'required|string|max:255',
+    ], [
+        'startingSerialNo.required' => 'Starting serial number harus diisi',
+    ]);
+
+    Rule::updateOrCreate(
+        ['rule_name' => 'starting_serial_no'],
+        ['rule_value' => $this->startingSerialNo]
+    );
+
+    $this->closeSerialModal();
+    session()->flash('success', '✅ Starting serial number berhasil disimpan!');
+}
+
 
     protected function getHeadRules()
     {
@@ -133,24 +170,28 @@ class MasterIndex extends Component
     }
 
     public function render()
-    {
-        $checksheets = ChecksheetHead::query()
-            ->with(['sections.details'])
-            ->when($this->search, function ($query) {
-                $query->where('title', 'like', '%' . $this->search . '%')
-                    ->orWhere('code', 'like', '%' . $this->search . '%')
-                    ->orWhere('document_number', 'like', '%' . $this->search . '%');
-            })
-            ->orderBy('order')
-            ->orderBy('created_at', 'desc')
-            ->paginate($this->perPage);
+{
+    $checksheets = ChecksheetHead::query()
+        ->with(['sections.details'])
+        ->when($this->search, function ($query) {
+            $query->where('title', 'like', '%' . $this->search . '%')
+                ->orWhere('code', 'like', '%' . $this->search . '%')
+                ->orWhere('document_number', 'like', '%' . $this->search . '%');
+        })
+        ->orderBy('order')
+        ->orderBy('created_at', 'desc')
+        ->paginate($this->perPage);
 
-        return view('livewire.checksheet.master-index', [
-            'checksheets' => $checksheets
-        ])
-        ->extends('layouts.app')
-        ->section('content');
-    }
+    $currentSerialNo = Rule::where('rule_name', 'starting_serial_no')->value('rule_value');
+
+    return view('livewire.checksheet.master-index', [
+        'checksheets'      => $checksheets,
+        'currentSerialNo'  => $currentSerialNo,
+    ])
+    ->extends('layouts.app')
+    ->section('content');
+}
+
 
     // ==================== HEAD METHODS ====================
 
