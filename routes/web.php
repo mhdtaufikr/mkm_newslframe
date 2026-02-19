@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Route;
 use App\Livewire\Checksheet\ChecksheetDetail;
 use App\Livewire\Checksheet\ChecksheetReport;
 use App\Livewire\Checksheet\ChecksheetReportDetail;
+use App\Livewire\Checksheet\ChecksheetHistory;
 
 
 Route::get('/', function () {
@@ -39,6 +40,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/checksheet/report/{id}', ChecksheetReportDetail::class)->name('checksheet.report.detail');
   // Master Checksheet
   Route::get('/checksheet/master', MasterIndex::class)->name('checksheet.master.index');
+  Route::get('/checksheet/history', ChecksheetHistory::class)->name('checksheet.history');
+
 });
 
 require __DIR__ . '/auth.php';
