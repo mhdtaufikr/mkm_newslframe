@@ -33,45 +33,58 @@ class ChecksheetHistory extends Component
     public function updatingFilterType() { $this->resetPage(); }
 
     private function getChartData(): array
-{
-    $year        = $this->filterYear ?: date('Y');
-    $checksheets = ChecksheetHead::orderBy('title')->get();
-    $months      = range(1, 12);
-    $charts      = [];
+    {
+        $year        = $this->filterYear ?: date('Y');
+        $checksheets = ChecksheetHead::orderBy('title')->get();
+        $months      = range(1, 12);
+        $charts      = [];
 
-    foreach ($checksheets as $cs) {
-        // Per bulan: hitung total serial dan berapa yang 100% OK (total_ng = 0)
-        $rows = ChecksheetInspection::where('checksheet_head_id', $cs->id)
-            ->whereYear('tanggal', $year)
-            ->where('total_items', '>', 0)
-            ->selectRaw('
-                MONTH(tanggal) as month,
-                COUNT(*) as total_serial,
-                SUM(CASE WHEN total_ng = 0 THEN 1 ELSE 0 END) as serial_ok
-            ')
-            ->groupByRaw('MONTH(tanggal)')
-            ->get()
-            ->keyBy('month');
+        foreach ($checksheets as $cs) {
+            $rows = ChecksheetInspection::where('checksheet_head_id', $cs->id)
+                ->whereYear('tanggal', $year)
+                ->where('total_items', '>', 0)
+                ->selectRaw('
+                    MONTH(tanggal) as month,
+                    COUNT(*) as total_serial,
+                    SUM(CASE WHEN total_ng = 0 THEN 1 ELSE 0 END) as serial_ok
+                ')
+                ->groupByRaw('MONTH(tanggal)')
+                ->get()
+                ->keyBy('month');
 
-        $data = [];
-        foreach ($months as $m) {
-            if (isset($rows[$m]) && $rows[$m]->total_serial > 0) {
-                $data[] = round(($rows[$m]->serial_ok / $rows[$m]->total_serial) * 100, 1);
-            } else {
-                $data[] = null;
+            $data    = [];
+            $okData  = [];
+            $ngData  = [];
+
+            foreach ($months as $m) {
+                if (isset($rows[$m]) && $rows[$m]->total_serial > 0) {
+                    $ok  = (int) $rows[$m]->serial_ok;
+                    $ng  = (int) $rows[$m]->total_serial - $ok;
+                    $pct = round(($ok / $rows[$m]->total_serial) * 100, 1);
+
+                    $data[]   = $pct;
+                    $okData[] = $ok;
+                    $ngData[] = $ng;
+                } else {
+                    $data[]   = null;
+                    $okData[] = null;
+                    $ngData[] = null;
+                }
             }
+
+            $charts[] = [
+                'id'     => $cs->id,
+                'title'  => $cs->title,
+                'code'   => $cs->code,
+                'data'   => $data,    // accuracy %
+                'okData' => $okData,  // ✅ tambah
+                'ngData' => $ngData,  // ✅ tambah
+            ];
         }
 
-        $charts[] = [
-            'id'    => $cs->id,
-            'title' => $cs->title,
-            'code'  => $cs->code,
-            'data'  => $data,
-        ];
+        return $charts;
     }
 
-    return $charts;
-}
 
 private function getNgBreakdownData(): array
 {
@@ -184,12 +197,14 @@ private function getNgBreakdownData(): array
             ->toArray();
 
         $ngBreakdown = $this->getNgBreakdownData();
+        $unitSummary = $this->getUnitSummaryData();
 
         return view('livewire.checksheet.checksheet-history', [
             'inspections'    => $inspections,
             'chartData'      => $chartData,
             'availableYears' => $availableYears,
-            'ngBreakdown'    => $ngBreakdown,   // ✅ tambah ini
+            'ngBreakdown'    => $ngBreakdown,
+            'unitSummary'    => $unitSummary,  // ✅ tambah ini
         ])
             ->extends('layouts.app')
             ->section('content');
@@ -257,5 +272,72 @@ public function closeModal(): void
     $this->modalItems = [];
     $this->dispatch('modalClosed'); // ✅ notify JS buat re-init chart
 }
+
+private function getUnitSummaryData(): array
+{
+    $year = $this->filterYear ?: date('Y');
+
+    $groups = [
+        'overall'     => [1, 2, 3, 4],
+        'kelengkapan' => [1, 2],
+        'welding'     => [3, 4],
+    ];
+
+    $result = [];
+
+    foreach ($groups as $groupKey => $csIds) {
+        $monthly = [];
+        $requiredCount = count($csIds);
+
+        for ($m = 1; $m <= 12; $m++) {
+
+            // Ambil serial number yang SUDAH ADA di SEMUA checksheet dalam group
+            // Caranya: group by serial_number, hitung distinct checksheet_head_id
+            // Jika count == jumlah checksheet dalam group → serial sudah lengkap
+            $completeSerials = ChecksheetInspection::whereIn('checksheet_head_id', $csIds)
+                ->whereYear('tanggal', $year)
+                ->whereMonth('tanggal', $m)
+                ->whereNotNull('serial_number')
+                ->where('serial_number', '!=', '')
+                ->selectRaw('serial_number, COUNT(DISTINCT checksheet_head_id) as cs_count')
+                ->groupBy('serial_number')
+                ->having('cs_count', '=', $requiredCount)
+                ->pluck('serial_number')
+                ->toArray();
+
+            if (empty($completeSerials)) {
+                $monthly[$m] = null;
+                continue;
+            }
+
+            $totalUnits = count($completeSerials);
+            $okUnits    = 0;
+
+            foreach ($completeSerials as $serial) {
+                // Cek semua inspeksi untuk serial ini di bulan ini → harus semua total_ng = 0
+                $allOk = ChecksheetInspection::whereIn('checksheet_head_id', $csIds)
+                    ->whereYear('tanggal', $year)
+                    ->whereMonth('tanggal', $m)
+                    ->where('serial_number', $serial)
+                    ->where('total_ng', '>', 0)
+                    ->doesntExist(); // ✅ true jika tidak ada satupun yang NG
+
+                if ($allOk) $okUnits++;
+            }
+
+            $monthly[$m] = [
+                'total' => $totalUnits,
+                'ok'    => $okUnits,
+                'ng'    => $totalUnits - $okUnits,
+            ];
+        }
+
+        $result[$groupKey] = $monthly;
+    }
+
+    return $result;
+}
+
+
 
 }

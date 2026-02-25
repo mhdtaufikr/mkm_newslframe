@@ -19,47 +19,134 @@
 
     <main class="max-w-7xl mx-auto px-6 py-6">
 
-        <!-- Accuracy Trend -->
-        <div class="mb-6">
+        {{-- ============================================================
+     UNIT QUALITY SUMMARY
+     ============================================================ --}}
+<div class="mb-6">
+    <div class="flex items-center justify-between mb-3">
+        <div>
+            <h2 class="text-base font-bold text-slate-800">Unit Quality Summary</h2>
+            <p class="text-xs text-slate-500">Jumlah unit OK vs NG per bulan berdasarkan gabungan checksheet — {{ $filterYear ?: date('Y') }}</p>
+        </div>
+        <select wire:model.live="filterYear"
+        class="px-3 py-2 rounded-lg border border-slate-200 focus:border-slate-400 outline-none text-sm bg-white font-bold text-slate-700">
+    @foreach($availableYears as $year)
+        <option value="{{ $year }}">{{ $year }}</option>
+    @endforeach
+    @if(empty($availableYears))
+        <option value="{{ date('Y') }}">{{ date('Y') }}</option>
+    @endif
+</select>
+    </div>
+
+    <div class="grid grid-cols-1 gap-4">
+
+        {{-- Overall (semua 4 checksheet) --}}
+        <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
             <div class="flex items-center justify-between mb-3">
                 <div>
-                    <h2 class="text-base font-bold text-slate-800">Accuracy Trend</h2>
-                    <p class="text-xs text-slate-500">Rata-rata accuracy per bulan per checksheet</p>
+                    <p class="text-sm font-bold text-slate-800 leading-tight">Overall — Semua Checksheet</p>
+                    <span class="text-xs text-slate-400 font-medium">QG-001 + QG-002 + QG-003 + QG-004</span>
                 </div>
-                <select wire:model.live="filterYear"
-                        class="px-3 py-2 rounded-lg border border-slate-200 focus:border-slate-400 outline-none text-sm bg-white font-bold text-slate-700">
-                    @foreach($availableYears as $year)
-                        <option value="{{ $year }}">{{ $year }}</option>
-                    @endforeach
-                    @if(empty($availableYears))
-                        <option value="{{ date('Y') }}">{{ date('Y') }}</option>
-                    @endif
-                </select>
+                @php
+                    $totalOkAll  = array_sum(array_column(array_filter($unitSummary['overall'], fn($v) => $v !== null), 'ok'));
+                    $totalNgAll  = array_sum(array_column(array_filter($unitSummary['overall'], fn($v) => $v !== null), 'ng'));
+                    $totalAllAll = $totalOkAll + $totalNgAll;
+                @endphp
+                <div class="flex items-center gap-2">
+                    <span class="px-2.5 py-1 bg-green-50 text-green-700 rounded-lg text-xs font-bold">✓ {{ $totalOkAll }} OK</span>
+                    <span class="px-2.5 py-1 bg-red-50 text-red-700 rounded-lg text-xs font-bold">✗ {{ $totalNgAll }} NG</span>
+                </div>
             </div>
-
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                @foreach($chartData as $chart)
-                    <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
-                        <div class="flex items-center justify-between mb-3">
-                            <div>
-                                <p class="text-sm font-bold text-slate-800 leading-tight">{{ $chart['title'] }}</p>
-                                <span class="text-xs text-slate-400 font-medium">{{ $chart['code'] }}</span>
-                            </div>
-                            @php
-                                $validData = array_filter($chart['data'], fn($v) => $v !== null);
-                                $avgAll    = count($validData) > 0 ? round(array_sum($validData) / count($validData), 1) : 0;
-                            @endphp
-                            <span class="text-lg font-black {{ $avgAll >= 95 ? 'text-green-600' : ($avgAll >= 80 ? 'text-yellow-600' : 'text-red-600') }}">
-                                {{ $avgAll }}%
-                            </span>
-                        </div>
-                        <div style="position: relative; width: 100%; height: 140px;">
-                            <canvas id="chart-{{ $chart['id'] }}"></canvas>
-                        </div>
-                    </div>
-                @endforeach
+            <div style="position: relative; width: 100%; height: 180px;">
+                <canvas id="chart-unit-overall"></canvas>
             </div>
         </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+            {{-- Kelengkapan Part --}}
+            <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+                <div class="flex items-center justify-between mb-3">
+                    <div>
+                        <p class="text-sm font-bold text-slate-800 leading-tight">Kelengkapan Part</p>
+                        <span class="text-xs text-slate-400 font-medium">QG-001 (LH) + QG-002 (RH)</span>
+                    </div>
+                    @php
+                        $totalOkKel  = array_sum(array_column(array_filter($unitSummary['kelengkapan'], fn($v) => $v !== null), 'ok'));
+                        $totalNgKel  = array_sum(array_column(array_filter($unitSummary['kelengkapan'], fn($v) => $v !== null), 'ng'));
+                    @endphp
+                    <div class="flex flex-col items-end gap-1">
+                        <span class="px-2 py-0.5 bg-green-50 text-green-700 rounded text-xs font-bold">✓ {{ $totalOkKel }}</span>
+                        <span class="px-2 py-0.5 bg-red-50 text-red-700 rounded text-xs font-bold">✗ {{ $totalNgKel }}</span>
+                    </div>
+                </div>
+                <div style="position: relative; width: 100%; height: 180px;">
+                    <canvas id="chart-unit-kelengkapan"></canvas>
+                </div>
+            </div>
+
+            {{-- Kualitas Welding --}}
+            <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+                <div class="flex items-center justify-between mb-3">
+                    <div>
+                        <p class="text-sm font-bold text-slate-800 leading-tight">Kualitas Welding</p>
+                        <span class="text-xs text-slate-400 font-medium">QG-003 (Sec 1-3) + QG-004 (Sec 4-6)</span>
+                    </div>
+                    @php
+                        $totalOkWeld = array_sum(array_column(array_filter($unitSummary['welding'], fn($v) => $v !== null), 'ok'));
+                        $totalNgWeld = array_sum(array_column(array_filter($unitSummary['welding'], fn($v) => $v !== null), 'ng'));
+                    @endphp
+                    <div class="flex flex-col items-end gap-1">
+                        <span class="px-2 py-0.5 bg-green-50 text-green-700 rounded text-xs font-bold">✓ {{ $totalOkWeld }}</span>
+                        <span class="px-2 py-0.5 bg-red-50 text-red-700 rounded text-xs font-bold">✗ {{ $totalNgWeld }}</span>
+                    </div>
+                </div>
+                <div style="position: relative; width: 100%; height: 180px;">
+                    <canvas id="chart-unit-welding"></canvas>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+
+        <!-- Accuracy Trend -->
+<div class="mb-6">
+    <div class="flex items-center justify-between mb-3">
+        <div>
+            <h2 class="text-base font-bold text-slate-800">Accuracy Trend</h2>
+            <p class="text-xs text-slate-500">Jumlah unit OK/NG & pass rate per bulan per checksheet</p>
+        </div>
+
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        @foreach($chartData as $chart)
+            <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+                <div class="flex items-center justify-between mb-3">
+                    <div>
+                        <p class="text-sm font-bold text-slate-800 leading-tight">{{ $chart['title'] }}</p>
+                        <span class="text-xs text-slate-400 font-medium">{{ $chart['code'] }}</span>
+                    </div>
+                    @php
+                        $validData = array_filter($chart['data'], fn($v) => $v !== null);
+                        $avgAll    = count($validData) > 0 ? round(array_sum($validData) / count($validData), 1) : 0;
+                    @endphp
+                    <span class="text-lg font-black {{ $avgAll >= 95 ? 'text-green-600' : ($avgAll >= 80 ? 'text-yellow-600' : 'text-red-600') }}">
+                        {{ $avgAll }}%
+                    </span>
+                </div>
+                {{-- tinggi naik jadi 180px karena dual axis --}}
+                <div style="position: relative; width: 100%; height: 180px;">
+                    <canvas id="chart-{{ $chart['id'] }}"></canvas>
+                </div>
+            </div>
+        @endforeach
+    </div>
+</div>
+
 
         @if(!empty($ngBreakdown))
         <div class="mb-6">
@@ -300,11 +387,14 @@
     const months      = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     const chartData   = @json($chartData);
     const ngBreakdown = @json($ngBreakdown);
-    const charts      = {};
-    const ngCharts    = {};
+    const unitSummary = @json($unitSummary);
     const ngColors    = ['#dc2626','#ea580c','#ca8a04','#65a30d','#0891b2'];
 
-    // ✅ Flag: skip re-init saat modal sedang buka
+    // Simpan instance chart supaya bisa di-destroy saat re-init
+    const charts     = {};
+    const ngCharts   = {};
+    const unitCharts = {};
+
     let modalIsOpen = false;
 
     function getLivewireComponent() {
@@ -313,143 +403,250 @@
             ?? null;
     }
 
+    // Helper: build mixed bar+line chart config (reusable)
+    function buildMixedConfig({ okData, ngData, countLabel = 'Serial', passRateColorByValue = true }) {
+        const passRate = okData.map((ok, i) => {
+            const ng = ngData[i];
+            if (ok === null && ng === null) return null;
+            const total = (ok ?? 0) + (ng ?? 0);
+            return total > 0 ? Math.round((ok / total) * 1000) / 10 : null;
+        });
+
+        const pointColors = passRate.map(v => {
+            if (v === null) return 'transparent';
+            if (!passRateColorByValue) return '#2563eb';
+            return v >= 95 ? '#16a34a' : v >= 80 ? '#ca8a04' : '#dc2626';
+        });
+
+        return {
+            type: 'bar',
+            data: {
+                labels: months,
+                datasets: [
+                    {
+                        label: 'OK',
+                        type: 'bar',
+                        data: okData,
+                        backgroundColor: '#16a34a99',
+                        borderColor: '#16a34a',
+                        borderWidth: 1.5,
+                        borderRadius: 3,
+                        stack: 'stack',
+                        yAxisID: 'yCount',
+                    },
+                    {
+                        label: 'NG',
+                        type: 'bar',
+                        data: ngData,
+                        backgroundColor: '#dc262699',
+                        borderColor: '#dc2626',
+                        borderWidth: 1.5,
+                        borderRadius: 3,
+                        stack: 'stack',
+                        yAxisID: 'yCount',
+                    },
+                    {
+                        label: 'Pass Rate',
+                        type: 'line',
+                        data: passRate,
+                        borderColor: '#2563eb',
+                        backgroundColor: 'rgba(37,99,235,0.06)',
+                        borderWidth: 2,
+                        pointBackgroundColor: pointColors,
+                        pointBorderColor: pointColors,
+                        pointRadius: passRate.map(v => v === null ? 0 : 4),
+                        pointHoverRadius: 6,
+                        fill: false,
+                        tension: 0.4,
+                        spanGaps: false,
+                        yAxisID: 'yPct',
+                    },
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top',
+                        labels: { font: { size: 10 }, boxWidth: 10, padding: 8 }
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                        callbacks: {
+                            title: ctx => months[ctx[0].dataIndex],
+                            label: ctx => {
+                                if (ctx.dataset.label === 'Pass Rate') {
+                                    return ` Pass Rate: ${ctx.raw ?? '-'}%`;
+                                }
+                                return ` ${ctx.dataset.label}: ${ctx.raw ?? 0} ${countLabel}`;
+                            },
+                            footer: ctxArr => {
+                                const ok    = ctxArr.find(c => c.dataset.label === 'OK')?.raw ?? 0;
+                                const ng    = ctxArr.find(c => c.dataset.label === 'NG')?.raw ?? 0;
+                                const total = ok + ng;
+                                return total > 0 ? `Total: ${total} ${countLabel}` : '';
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        stacked: true,
+                        ticks: { font: { size: 9 } },
+                        grid: { display: false }
+                    },
+                    yCount: {
+                        type: 'linear',
+                        position: 'left',
+                        stacked: true,
+                        beginAtZero: true,
+                        ticks: {
+                            stepSize: 1,
+                            font: { size: 10 },
+                            callback: v => Number.isInteger(v) ? v : ''
+                        },
+                        grid: { color: 'rgba(0,0,0,0.05)' },
+                        title: { display: true, text: countLabel, font: { size: 9 }, color: '#94a3b8' }
+                    },
+                    yPct: {
+                        type: 'linear',
+                        position: 'right',
+                        min: 0,
+                        max: 100,
+                        ticks: {
+                            stepSize: 20,
+                            font: { size: 10 },
+                            callback: v => v + '%'
+                        },
+                        grid: { drawOnChartArea: false },
+                        title: { display: true, text: 'Pass Rate', font: { size: 9 }, color: '#2563eb' }
+                    }
+                }
+            }
+        };
+    }
+
     function initCharts() {
-        // ✅ Jangan re-init kalau modal sedang terbuka
         if (modalIsOpen) return;
 
-        // ── Accuracy line charts ──────────────────────────────
+        // ── 1. Accuracy Trend (mixed bar + line per checksheet) ──
         chartData.forEach(cs => {
             const el = document.getElementById('chart-' + cs.id);
             if (!el) return;
             if (charts[cs.id]) { charts[cs.id].destroy(); delete charts[cs.id]; }
 
-            charts[cs.id] = new Chart(el, {
-                type: 'line',
-                data: {
-                    labels: months,
-                    datasets: [{
-                        label: 'Accuracy %',
-                        data: cs.data,
-                        borderColor: '#475569',
-                        backgroundColor: 'rgba(71,85,105,0.08)',
-                        borderWidth: 2.5,
-                        pointBackgroundColor: cs.data.map(v =>
-                            v === null ? 'transparent' : v >= 95 ? '#16a34a' : v >= 80 ? '#ca8a04' : '#dc2626'
-                        ),
-                        pointBorderColor: cs.data.map(v =>
-                            v === null ? 'transparent' : v >= 95 ? '#16a34a' : v >= 80 ? '#ca8a04' : '#dc2626'
-                        ),
-                        pointRadius: cs.data.map(v => v === null ? 0 : 5),
-                        pointHoverRadius: 7,
-                        fill: true,
-                        tension: 0.4,
-                        spanGaps: false,
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false },
-                        tooltip: {
-                            callbacks: {
-                                label: ctx => ctx.raw !== null ? ctx.raw + '%' : 'No data'
-                            }
-                        }
-                    },
-                    scales: {
-                        y: {
-                            min: 0, max: 100,
-                            ticks: { stepSize: 20, callback: v => v + '%', font: { size: 10 } },
-                            grid: { color: 'rgba(0,0,0,0.05)' }
-                        },
-                        x: {
-                            ticks: { font: { size: 10 } },
-                            grid: { display: false }
-                        }
-                    }
-                }
-            });
+            charts[cs.id] = new Chart(el, buildMixedConfig({
+                okData: cs.okData,
+                ngData: cs.ngData,
+                countLabel: 'Serial',
+            }));
         });
 
-      // ── NG Breakdown stacked bar charts ──────────────────
-if (!ngBreakdown || ngBreakdown.length === 0) return;
+        // ── 2. NG Breakdown (stacked bar per checksheet) ──
+        if (ngBreakdown && ngBreakdown.length > 0) {
+            ngBreakdown.forEach(ng => {
+                const el = document.getElementById('chart-ng-' + ng.id);
+                if (!el) return;
+                if (ngCharts[ng.id]) { ngCharts[ng.id].destroy(); delete ngCharts[ng.id]; }
 
-ngBreakdown.forEach(ng => {
-    const el = document.getElementById('chart-ng-' + ng.id);
-    if (!el) return;
-    if (ngCharts[ng.id]) { ngCharts[ng.id].destroy(); delete ngCharts[ng.id]; }
+                const csId     = ng.id;
+                const datasets = ng.datasets.map((ds, i) => ({
+                    label: ds.type,
+                    data: ds.data,
+                    backgroundColor: ngColors[i % ngColors.length] + 'cc',
+                    borderColor: ngColors[i % ngColors.length],
+                    borderWidth: 1,
+                    borderRadius: 3,
+                    stack: 'ng',
+                }));
 
-    const csId = ng.id;
-
-    // Build datasets per type
-    const datasets = ng.datasets.map((ds, i) => ({
-        label: ds.type,
-        data: ds.data,
-        backgroundColor: ngColors[i % ngColors.length] + 'cc',
-        borderColor: ngColors[i % ngColors.length],
-        borderWidth: 1,
-        borderRadius: 3,
-        stack: 'ng',
-    }));
-
-    ngCharts[csId] = new Chart(el, {
-        type: 'bar',
-        data: {
-            labels: months,
-            datasets: datasets,
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            onClick: (event, elements) => {
-                if (elements.length === 0) return;
-                const monthIndex = elements[0].index;          // 0-based
-                const dsIndex    = elements[0].datasetIndex;
-                const ngType     = ng.datasets[dsIndex].type;
-                const monthNum   = monthIndex + 1;             // 1-based
-                const comp       = getLivewireComponent();
-                if (comp) {
-                    modalIsOpen = true;
-                    comp.loadNgDetail(csId, ngType, monthNum);
-                }
-            },
-            plugins: {
-                legend: {
-                    display: false, // kita pakai legend chips dari blade
-                },
-                tooltip: {
-                    mode: 'index',     // tampilkan semua type di bulan yang sama
-                    intersect: false,
-                    callbacks: {
-                        title: ctx => months[ctx[0].dataIndex],
-                        label: ctx => ` ${ctx.dataset.label}: ${ctx.raw} temuan`,
-                        footer: ctxArr => {
-                            const total = ctxArr.reduce((s, c) => s + c.raw, 0);
-                            return total > 0 ? `Total: ${total} temuan` : '';
+                ngCharts[csId] = new Chart(el, {
+                    type: 'bar',
+                    data: { labels: months, datasets },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        onClick: (event, elements) => {
+                            if (elements.length === 0) return;
+                            const monthIndex = elements[0].index;
+                            const dsIndex    = elements[0].datasetIndex;
+                            const ngType     = ng.datasets[dsIndex].type;
+                            const monthNum   = monthIndex + 1;
+                            const comp       = getLivewireComponent();
+                            if (comp) {
+                                modalIsOpen = true;
+                                comp.loadNgDetail(csId, ngType, monthNum);
+                            }
+                        },
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                mode: 'index',
+                                intersect: false,
+                                callbacks: {
+                                    title: ctx => months[ctx[0].dataIndex],
+                                    label: ctx => ` ${ctx.dataset.label}: ${ctx.raw} temuan`,
+                                    footer: ctxArr => {
+                                        const total = ctxArr.reduce((s, c) => s + c.raw, 0);
+                                        return total > 0 ? `Total: ${total} temuan` : '';
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                stacked: true,
+                                ticks: { font: { size: 9 } },
+                                grid: { display: false }
+                            },
+                            y: {
+                                stacked: true,
+                                beginAtZero: true,
+                                ticks: { stepSize: 1, font: { size: 10 } },
+                                grid: { color: 'rgba(0,0,0,0.05)' }
+                            }
                         }
                     }
-                }
-            },
-            scales: {
-                x: {
-                    stacked: true,
-                    ticks: { font: { size: 9 } },
-                    grid: { display: false }
-                },
-                y: {
-                    stacked: true,
-                    beginAtZero: true,
-                    ticks: { stepSize: 1, font: { size: 10 } },
-                    grid: { color: 'rgba(0,0,0,0.05)' }
-                }
-            }
+                });
+            });
         }
-    });
-});
+
+        // ── 3. Unit Quality Summary (mixed bar + line per group) ──
+        if (unitSummary) {
+            const unitGroups = [
+                { key: 'overall',     canvasId: 'chart-unit-overall',     countLabel: 'Unit' },
+                { key: 'kelengkapan', canvasId: 'chart-unit-kelengkapan', countLabel: 'Unit' },
+                { key: 'welding',     canvasId: 'chart-unit-welding',     countLabel: 'Unit' },
+            ];
+
+            unitGroups.forEach(group => {
+                const el = document.getElementById(group.canvasId);
+                if (!el) return;
+                if (unitCharts[group.key]) { unitCharts[group.key].destroy(); delete unitCharts[group.key]; }
+
+                const monthlyData = unitSummary[group.key];
+                const okData = [];
+                const ngData = [];
+
+                for (let m = 1; m <= 12; m++) {
+                    const d = monthlyData[m];
+                    okData.push(d ? d.ok : null);
+                    ngData.push(d ? d.ng : null);
+                }
+
+                unitCharts[group.key] = new Chart(el, buildMixedConfig({
+                    okData,
+                    ngData,
+                    countLabel: group.countLabel,
+                }));
+            });
+        }
     }
 
-    // ✅ Reset flag saat modal ditutup, lalu re-init chart
+    // ── Event listeners ──
     document.addEventListener('livewire:initialized', () => {
         Livewire.on('modalClosed', () => {
             modalIsOpen = false;
@@ -464,4 +661,5 @@ ngBreakdown.forEach(ng => {
     });
 </script>
 @endpush
+
 
