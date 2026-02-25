@@ -51,23 +51,17 @@
             <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div>
                     <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Nama</label>
-                    <input type="text"
-                           wire:model.defer="nama"
-                           readonly
+                    <input type="text" wire:model.defer="nama" readonly
                            class="w-full px-3 py-2 rounded-lg border border-slate-200 bg-slate-100 text-slate-500 cursor-not-allowed outline-none text-sm">
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Tanggal</label>
-                    <input type="date"
-                           wire:model.defer="tanggal"
-                           readonly
+                    <input type="date" wire:model.defer="tanggal" readonly
                            class="w-full px-3 py-2 rounded-lg border border-slate-200 bg-slate-100 text-slate-500 cursor-not-allowed outline-none text-sm">
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Serial Number</label>
-                    <input type="text"
-                           wire:model.defer="serial_number"
-                           readonly
+                    <input type="text" wire:model.defer="serial_number" readonly
                            class="w-full px-3 py-2 rounded-lg border border-slate-200 bg-slate-100 text-slate-500 cursor-not-allowed outline-none text-sm font-mono">
                 </div>
             </div>
@@ -77,7 +71,6 @@
         <div class="space-y-4">
             @forelse($sections as $section)
                 @php
-                    // Progress per section
                     $totalItems  = $section->details->count();
                     $filledItems = 0;
 
@@ -104,7 +97,8 @@
                 <div class="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
 
                     <!-- Section Header -->
-                    <div class="px-4 py-3 bg-slate-100 cursor-pointer hover:bg-slate-200 transition-colors" wire:click="toggleSection({{ $section->id }})">
+                    <div class="px-4 py-3 bg-slate-100 cursor-pointer hover:bg-slate-200 transition-colors"
+                         wire:click="toggleSection({{ $section->id }})">
                         <div class="flex items-center justify-between">
                             <div class="flex items-center gap-3">
                                 <div class="w-10 h-10 bg-slate-700 text-white rounded-lg flex items-center justify-center font-bold text-base">
@@ -116,7 +110,6 @@
                                 </div>
                             </div>
                             <div class="flex items-center gap-3">
-                                <!-- Progress Badge -->
                                 <span class="text-xs font-bold px-2 py-1 rounded-lg {{ $pct === 100 ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700' }}">
                                     {{ $filledItems }}/{{ $totalItems }}
                                 </span>
@@ -126,8 +119,6 @@
                                 </svg>
                             </div>
                         </div>
-
-                        <!-- Progress Bar -->
                         <div class="mt-2 w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
                             <div class="h-1.5 rounded-full transition-all duration-300 {{ $pct === 100 ? 'bg-green-500' : 'bg-yellow-400' }}"
                                  style="width: {{ $pct }}%"></div>
@@ -141,7 +132,6 @@
                         @if($section->section_images || $section->section_description)
                             <div class="px-4 py-3 bg-slate-50 border-b border-slate-200">
                                 <p class="text-xs font-bold text-slate-500 uppercase mb-2">📸 SKETCH SECTION</p>
-
                                 @if($section->section_images)
                                     @php $images = json_decode($section->section_images, true); @endphp
                                     @if(is_array($images) && count($images) > 0)
@@ -164,7 +154,6 @@
                                         <p class="text-xs text-slate-400 italic mt-2">💡 Klik gambar untuk zoom ({{ count($images) }} images)</p>
                                     @endif
                                 @endif
-
                                 @if($section->section_description)
                                     <p class="text-sm text-slate-600 mt-3 leading-relaxed">{{ $section->section_description }}</p>
                                 @endif
@@ -172,8 +161,7 @@
                         @endif
 
                         <!-- Image Zoom Modal -->
-                        <div x-show="showModal"
-                             x-cloak
+                        <div x-show="showModal" x-cloak
                              @click="showModal = false"
                              class="fixed inset-0 bg-black/95 backdrop-blur-sm z-[100] flex items-center justify-center animate-fade-in">
                             <div class="relative w-full h-full flex items-center justify-center" @click.stop>
@@ -183,8 +171,7 @@
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                                     </svg>
                                 </button>
-                                <img :src="'{{ asset('images/section') }}/' + selectedImage"
-                                     alt="Zoomed Image"
+                                <img :src="'{{ asset('images/section') }}/' + selectedImage" alt="Zoomed Image"
                                      class="w-screen h-screen object-contain">
                                 <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-6">
                                     <p class="text-sm font-semibold text-white" x-text="selectedImage"></p>
@@ -250,51 +237,35 @@
                                             $weldingAtas  = $matchAtas[1]  ?? null;
                                             $weldingBawah = $matchBawah[1] ?? null;
                                             $ngKeys       = array_map(fn($t) => 'ng_' . strtolower(str_replace(' ', '_', $t)), $weldingNgTypes);
-                                            $ngKeysJson   = json_encode($ngKeys);
                                             $detailId     = $detail->id;
-                                            $isOkInit     = ($checkResults[$detail->id]['is_ok'] ?? false) ? 'true' : 'false';
+
+                                            // State dari Livewire langsung — PHP yang jadi source of truth
+                                            $isOkChecked  = (bool) ($checkResults[$detailId]['is_ok'] ?? false);
+                                            $anyNgChecked = false;
+                                            foreach ($ngKeys as $ngKey) {
+                                                if (($checkResults[$detailId][$ngKey] ?? 0) == 1) {
+                                                    $anyNgChecked = true;
+                                                    break;
+                                                }
+                                            }
+                                            // Sanitasi: jika isOk true, paksa anyNg false
+                                            if ($isOkChecked) $anyNgChecked = false;
                                         @endphp
 
                                         <tr wire:key="detail-{{ $detailId }}"
-                                            x-data="{
-                                                isOk: {{ $isOkInit }},
-                                                unfilled: false,
-                                                ngKeys: {{ $ngKeysJson }},
-                                                detailId: {{ $detailId }},
-                                                toggle() {
-                                                    this.isOk = !this.isOk;
-                                                    this.unfilled = false;
-                                                    $wire.set('checkResults.' + this.detailId + '.is_ok', this.isOk);
-                                                    if (this.isOk) {
-                                                        this.ngKeys.forEach(key => {
-                                                            $wire.set('checkResults.' + this.detailId + '.' + key, null);
-                                                        });
-                                                    }
-                                                }
-                                            }"
-                                            x-on:highlight-unfilled.window="unfilled = $event.detail.detailIds.includes(detailId)"
-                                            x-on:clear-highlight.window="unfilled = false"
-                                            :class="unfilled
-                                                ? 'bg-yellow-50 border-l-4 border-yellow-400'
-                                                : '{{ $isCritical ? 'bg-red-50 border-l-4 border-l-transparent' : 'bg-white hover:bg-slate-50 border-l-4 border-l-transparent' }}'"
-                                            class="transition-colors">
+                                            class="transition-colors {{ $isCritical ? 'bg-red-50' : 'bg-white hover:bg-slate-50' }}">
 
+                                            <!-- NO -->
                                             <td class="px-3 py-2 text-center">
                                                 <span class="font-bold text-slate-700">{{ $index + 1 }}</span>
                                             </td>
 
                                             <!-- Item Check -->
                                             <td class="px-3 py-2">
-                                                <div>
-                                                    <p class="font-semibold text-slate-800 leading-tight">{{ $detail->item_name }}</p>
-                                                    @if($detail->item_code)
-                                                        <span class="inline-block mt-0.5 text-xs text-slate-500 font-medium">{{ $detail->item_code }}</span>
-                                                    @endif
-                                                    <span x-show="unfilled" x-cloak
-                                                          class="inline-flex items-center gap-1 mt-0.5 text-xs text-yellow-600 font-semibold">
-                                                        ⚠ Wajib diisi
-                                                    </span>
-                                                </div>
+                                                <p class="font-semibold text-slate-800 leading-tight">{{ $detail->item_name }}</p>
+                                                @if($detail->item_code)
+                                                    <span class="inline-block mt-0.5 text-xs text-slate-500 font-medium">{{ $detail->item_code }}</span>
+                                                @endif
                                             </td>
 
                                             <!-- Σ Welding Atas -->
@@ -324,36 +295,60 @@
                                                 @endif
                                             </td>
 
-                                            <!-- OK Toggle -->
-                                            <td class="px-3 py-2 text-center w-20">
-                                                <div class="flex justify-center items-center">
-                                                    <button type="button"
-                                                            x-on:click="toggle()"
-                                                            :class="isOk ? 'bg-green-500 shadow-sm' : 'bg-green-50 hover:bg-green-100'"
-                                                            class="p-2 rounded-lg transition-colors duration-100">
-                                                        <svg :class="isOk ? 'text-white' : 'text-green-300'"
-                                                             :fill="isOk ? 'currentColor' : 'none'"
-                                                             class="w-5 h-5"
-                                                             stroke="currentColor" stroke-width="3" viewBox="0 0 24 24">
+                                            <!-- OK Checkbox -->
+                                            <td class="px-3 py-2 text-center">
+                                                <label class="inline-flex items-center justify-center w-10 h-10 rounded-lg cursor-pointer transition-colors
+                                                    {{ $anyNgChecked ? 'bg-red-500' : ($isOkChecked ? 'bg-green-500' : 'bg-slate-100 hover:bg-slate-200') }}">
+                                                    <input type="checkbox"
+                                                           wire:model="checkResults.{{ $detailId }}.is_ok"
+                                                           wire:change="clearNgOnOk({{ $detailId }})"
+                                                           {{ $isOkChecked ? 'checked' : '' }}
+                                                           class="sr-only">
+                                                    @if($anyNgChecked)
+                                                        {{-- Silang merah: ada NG --}}
+                                                        <svg class="w-5 h-5 text-white" stroke="currentColor" stroke-width="3" fill="none" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                                        </svg>
+                                                    @elseif($isOkChecked)
+                                                        {{-- Centang hijau: OK --}}
+                                                        <svg class="w-5 h-5 text-white" stroke="currentColor" stroke-width="3" fill="none" viewBox="0 0 24 24">
                                                             <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
                                                         </svg>
-                                                    </button>
-                                                </div>
+                                                    @else
+                                                        {{-- Kosong / netral --}}
+                                                        <svg class="w-5 h-5 text-slate-400" stroke="currentColor" stroke-width="2" fill="none" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14" />
+                                                        </svg>
+                                                    @endif
+                                                </label>
                                             </td>
 
-                                            <!-- NG Inputs -->
+                                            <!-- NG Checkboxes -->
                                             @foreach($weldingNgTypes as $ngType)
-                                                @php $key = 'ng_' . strtolower(str_replace(' ', '_', $ngType)); @endphp
+                                                @php
+                                                    $key       = 'ng_' . strtolower(str_replace(' ', '_', $ngType));
+                                                    $ngChecked = !$isOkChecked && ($checkResults[$detailId][$key] ?? 0) == 1;
+                                                @endphp
                                                 <td class="px-3 py-2 text-center">
-                                                    <input type="number" min="0"
-                                                           wire:model="checkResults.{{ $detailId }}.{{ $key }}"
-                                                           placeholder="-"
-                                                           :disabled="isOk"
-                                                           x-on:input="unfilled = false"
-                                                           :class="isOk
-                                                               ? 'border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed'
-                                                               : 'border-red-200 focus:border-red-400 focus:ring-2 focus:ring-red-100 bg-white'"
-                                                           class="w-14 text-center px-1 py-1.5 rounded border transition-colors outline-none text-sm">
+                                                    <label class="inline-flex items-center justify-center w-10 h-10 rounded-lg cursor-pointer transition-colors
+                                                        {{ $isOkChecked ? 'bg-slate-100 opacity-40 cursor-not-allowed' : ($ngChecked ? 'bg-red-500' : 'bg-red-50 hover:bg-red-100') }}">
+                                                        <input type="checkbox"
+                                                               wire:model="checkResults.{{ $detailId }}.{{ $key }}"
+                                                               wire:change="clearOkOnNg({{ $detailId }})"
+                                                               {{ $ngChecked ? 'checked' : '' }}
+                                                               {{ $isOkChecked ? 'disabled' : '' }}
+                                                               value="1"
+                                                               class="sr-only">
+                                                        @if($ngChecked)
+                                                            <svg class="w-5 h-5 text-white" stroke="currentColor" stroke-width="3" fill="none" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                                            </svg>
+                                                        @else
+                                                            <svg class="w-5 h-5 {{ $isOkChecked ? 'text-slate-300' : 'text-red-300' }}" stroke="currentColor" stroke-width="2.5" fill="none" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14" />
+                                                            </svg>
+                                                        @endif
+                                                    </label>
                                                 </td>
                                             @endforeach
 
@@ -379,8 +374,6 @@
                                             <td class="px-3 py-2 text-center">
                                                 <span class="font-bold text-slate-700">{{ $index + 1 }}</span>
                                             </td>
-
-                                            <!-- Item Check -->
                                             <td class="px-3 py-2">
                                                 <div>
                                                     <p class="font-semibold text-slate-800 leading-tight">{{ $detail->item_name }}</p>
@@ -393,8 +386,6 @@
                                                     </span>
                                                 </div>
                                             </td>
-
-                                            <!-- Q-Point -->
                                             <td class="px-3 py-2">
                                                 @if($detail->qpoint_name)
                                                     <p class="text-sm text-slate-700">{{ $detail->qpoint_name }}</p>
@@ -405,8 +396,6 @@
                                                     <span class="text-slate-400">-</span>
                                                 @endif
                                             </td>
-
-                                            <!-- OK Radio -->
                                             <td class="px-3 py-2 text-center w-20">
                                                 <div class="flex justify-center items-center">
                                                     <label class="p-2 rounded-lg cursor-pointer transition-all {{ $isOk ? 'bg-green-500 shadow-sm' : 'bg-green-50 hover:bg-green-100' }}">
@@ -419,8 +408,6 @@
                                                     </label>
                                                 </div>
                                             </td>
-
-                                            <!-- NG Radio -->
                                             <td class="px-3 py-2 text-center w-20">
                                                 <div class="flex justify-center items-center">
                                                     <label class="p-2 rounded-lg cursor-pointer transition-all {{ $isNg ? 'bg-red-500 shadow-sm' : 'bg-red-50 hover:bg-red-100' }}">
@@ -433,8 +420,6 @@
                                                     </label>
                                                 </div>
                                             </td>
-
-                                            <!-- Status / Remarks -->
                                             <td class="px-3 py-2">
                                                 <input type="text"
                                                        wire:model.defer="checkResults.{{ $detail->id }}.status"
@@ -444,7 +429,6 @@
 
                                         </tr>
                                     @endif
-
                                 @endforeach
                             </tbody>
                         </table>

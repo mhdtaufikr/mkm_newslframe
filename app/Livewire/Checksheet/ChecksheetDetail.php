@@ -284,6 +284,20 @@ class ChecksheetDetail extends Component
 
 
 
+    public function clearNgOnOk(int $detailId): void
+    {
+        // Saat OK di-check, clear semua NG key
+        foreach ($this->weldingNgTypes as $type) {
+            $key = 'ng_' . strtolower(str_replace(' ', '_', $type));
+            $this->checkResults[$detailId][$key] = null;
+        }
+    }
+
+    public function clearOkOnNg(int $detailId): void
+    {
+        // Saat salah satu NG di-check, clear OK
+        $this->checkResults[$detailId]['is_ok'] = false;
+    }
 
 
     // ─────────────────────────────────────────────
