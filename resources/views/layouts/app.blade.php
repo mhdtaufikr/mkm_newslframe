@@ -6,6 +6,20 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Digital Checksheet SL-Frame - Quality Management System')</title>
 
+    {{-- Favicon --}}
+    <link rel="icon" href="{{ asset('images/favicon/favicon.ico') }}" sizes="any">
+    <link rel="icon" href="{{ asset('images/favicon/favicon.svg') }}" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="{{ asset('images/favicon/apple-touch-icon.png') }}">
+
+    {{-- PWA --}}
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#1e293b">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="QG Checksheet">
+
+
     {{-- ✅ Livewire styles (include Alpine internally) --}}
     @livewireStyles
 
@@ -486,7 +500,21 @@
 
     {{-- ✅ Alpine collapse plugin — load SETELAH livewireScripts agar register ke Alpine instance Livewire --}}
     <script src="https://cdn.jsdelivr.net/npm/@alpinejs/collapse@3.x.x/dist/cdn.min.js"></script>
-
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                // Pakai asset() supaya otomatis ikut APP_URL
+                const swUrl   = '{{ asset('sw.js') }}';
+                const swScope = '{{ url('/') }}/';
+    
+                navigator.serviceWorker
+                    .register(swUrl, { scope: swScope })
+                    .then(r => console.log('SW:', r.scope))
+                    .catch(e => console.warn('SW failed:', e));
+            });
+        }
+    </script>
+    
     @stack('scripts')
 </body>
 </html>

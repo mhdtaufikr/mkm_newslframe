@@ -44,4 +44,33 @@ Route::middleware('auth')->group(function () {
 
 });
 
+Route::get('/manifest.json', function () {
+    $base = url('/'); // otomatis baca APP_URL dari .env
+    return response()->json([
+        'name'             => 'QG Checksheet App',
+        'short_name'       => 'QG Checksheet',
+        'start_url'        => $base,
+        'scope'            => $base . '/',
+        'display'          => 'standalone',
+        'background_color' => '#ffffff',
+        'theme_color'      => '#1e293b',
+        'orientation'      => 'portrait-primary',
+        'icons'            => [
+            [
+                'src'     => asset('images/favicon/web-app-manifest-192x192.png'),
+                'sizes'   => '192x192',
+                'type'    => 'image/png',
+                'purpose' => 'any maskable',
+            ],
+            [
+                'src'     => asset('images/favicon/web-app-manifest-512x512.png'),
+                'sizes'   => '512x512',
+                'type'    => 'image/png',
+                'purpose' => 'any maskable',
+            ],
+        ],
+    ])->header('Content-Type', 'application/manifest+json');
+});
+
+
 require __DIR__ . '/auth.php';
