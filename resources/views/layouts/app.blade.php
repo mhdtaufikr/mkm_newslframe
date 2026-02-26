@@ -506,7 +506,7 @@
                 // Pakai asset() supaya otomatis ikut APP_URL
                 const swUrl   = '{{ asset('sw.js') }}';
                 const swScope = '{{ url('/') }}/';
-    
+
                 navigator.serviceWorker
                     .register(swUrl, { scope: swScope })
                     .then(r => console.log('SW:', r.scope))
@@ -514,7 +514,7 @@
             });
         }
     </script>
-    
+
     @stack('scripts')
 </body>
 </html>
