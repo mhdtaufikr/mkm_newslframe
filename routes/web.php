@@ -42,6 +42,9 @@ Route::middleware('auth')->group(function () {
   Route::get('/checksheet/master', MasterIndex::class)->name('checksheet.master.index');
   Route::get('/checksheet/history', ChecksheetHistory::class)->name('checksheet.history');
 
+  Route::get('/users', \App\Livewire\Users\Index::class)->name('users.index');
+
+
 });
 
 Route::get('/manifest.json', function () {
