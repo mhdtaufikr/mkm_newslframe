@@ -78,22 +78,23 @@
         <div class="space-y-4">
             @forelse($sections as $section)
                 @php
-                    // Ambil config format untuk section ini
-                    $sConfig    = $sectionFormats[$section->id] ?? ['input_type' => 'standard', 'ng_types' => []];
-                    $inputType  = $sConfig['input_type'];
-                    $ngTypes    = $sConfig['ng_types'];
-                    $isWelding  = $inputType === 'welding';
+                    $sConfig      = $sectionFormats[$section->id] ?? [];
+                    $inputType    = $sConfig['input_type']    ?? 'standard';
+                    $ngTypes      = $sConfig['ng_types']       ?? [];
+                    $repairTypes  = $sConfig['repair_types']   ?? [];
+                    $hasAtasBawah = $sConfig['has_atas_bawah'] ?? false;
+                    $isWelding    = $inputType === 'welding';
+                    $hasRepair    = count($repairTypes) > 0;
 
-                    // Hitung progress
                     $totalItems  = $section->details->count();
                     $filledItems = 0;
 
                     foreach ($section->details as $d) {
-                        if ($isWelding) {
+                        if (!empty($ngTypes)) {
                             $isManualOk = (bool) ($checkResults[$d->id]['is_ok'] ?? false);
                             $ngSum = 0;
                             foreach ($ngTypes as $t) {
-                                $k      = 'ng_' . strtolower(str_replace(' ', '_', $t));
+                                $k = 'ng_' . strtolower(str_replace(' ', '_', $t));
                                 $ngSum += (int) ($checkResults[$d->id][$k] ?? 0);
                             }
                             if ($isManualOk || $ngSum > 0) $filledItems++;
@@ -102,8 +103,7 @@
                         }
                     }
 
-                    $remaining = $totalItems - $filledItems;
-                    $pct       = $totalItems > 0 ? round(($filledItems / $totalItems) * 100) : 0;
+                    $pct = $totalItems > 0 ? round(($filledItems / $totalItems) * 100) : 0;
                 @endphp
 
                 <div class="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
@@ -126,6 +126,10 @@
                                     <span class="text-xs font-bold px-2 py-1 rounded-lg bg-blue-100 text-blue-700">
                                         🔧 Welding
                                     </span>
+                                @elseif($hasRepair)
+                                    <span class="text-xs font-bold px-2 py-1 rounded-lg bg-purple-100 text-purple-700">
+                                        🎨 Painting
+                                    </span>
                                 @endif
                                 <span class="text-xs font-bold px-2 py-1 rounded-lg {{ $pct === 100 ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700' }}">
                                     {{ $filledItems }}/{{ $totalItems }}
@@ -143,11 +147,10 @@
                     </div>
 
                     @if(in_array($section->id, $expandedSections))
-                    <div x-data="{ showModal: false, selectedImage: '' }">
 
                         {{-- Section Image & Description --}}
                         @if($section->section_images || $section->section_description)
-                            <div class="px-4 py-3 bg-slate-50 border-b border-slate-200">
+                            <div x-data="{ showModal: false, selectedImage: '' }" class="px-4 py-3 bg-slate-50 border-b border-slate-200">
                                 <p class="text-xs font-bold text-slate-500 uppercase mb-2">📸 SKETCH SECTION</p>
                                 @if($section->section_images)
                                     @php $images = json_decode($section->section_images, true); @endphp
@@ -170,6 +173,27 @@
                                             @endforeach
                                         </div>
                                         <p class="text-xs text-slate-400 italic mt-2">💡 Klik gambar untuk zoom ({{ count($images) }} images)</p>
+
+                                        {{-- Image Zoom Modal --}}
+                                        <div x-show="showModal" x-cloak
+                                             @click="showModal = false"
+                                             class="fixed inset-0 bg-black/95 backdrop-blur-sm z-[100] flex items-center justify-center animate-fade-in">
+                                            <div class="relative w-full h-full flex items-center justify-center" @click.stop>
+                                                <button @click="showModal = false"
+                                                        class="absolute top-4 right-4 w-12 h-12 bg-white hover:bg-red-500 hover:text-white rounded-full flex items-center justify-center shadow-xl transition-all z-10 group">
+                                                    <svg class="w-6 h-6 text-slate-700 group-hover:text-white" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                                    </svg>
+                                                </button>
+                                                <img :src="'{{ asset('images/section') }}/' + selectedImage"
+                                                     alt="Zoomed Image"
+                                                     class="w-screen h-screen object-contain">
+                                                <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-6">
+                                                    <p class="text-sm font-semibold text-white" x-text="selectedImage"></p>
+                                                    <p class="text-xs text-slate-300">Klik di luar gambar atau tombol × untuk menutup</p>
+                                                </div>
+                                            </div>
+                                        </div>
                                     @endif
                                 @endif
                                 @if($section->section_description)
@@ -178,318 +202,379 @@
                             </div>
                         @endif
 
-                        {{-- Image Zoom Modal --}}
-                        <div x-show="showModal" x-cloak
-                             @click="showModal = false"
-                             class="fixed inset-0 bg-black/95 backdrop-blur-sm z-[100] flex items-center justify-center animate-fade-in">
-                            <div class="relative w-full h-full flex items-center justify-center" @click.stop>
-                                <button @click="showModal = false"
-                                        class="absolute top-4 right-4 w-12 h-12 bg-white hover:bg-red-500 hover:text-white rounded-full flex items-center justify-center shadow-xl transition-all z-10 group">
-                                    <svg class="w-6 h-6 text-slate-700 group-hover:text-white" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                    </svg>
-                                </button>
-                                <img :src="'{{ asset('images/section') }}/' + selectedImage"
-                                     alt="Zoomed Image"
-                                     class="w-screen h-screen object-contain">
-                                <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-6">
-                                    <p class="text-sm font-semibold text-white" x-text="selectedImage"></p>
-                                    <p class="text-xs text-slate-300">Klik di luar gambar atau tombol × untuk menutup</p>
-                                </div>
-                            </div>
-                        </div>
-
-                    </div>
-
-                    {{-- ─── Inspection Table ────────────────────── --}}
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-sm">
-                            <thead>
-                                @if($isWelding)
-                                    <tr class="bg-slate-50 border-b border-slate-200">
-                                        <th class="px-3 py-2 text-center text-xs font-bold text-slate-700 uppercase w-12" rowspan="2">NO</th>
-                                        <th class="px-3 py-2 text-left text-xs font-bold text-slate-700 uppercase" rowspan="2">ITEM CHECK</th>
-                                        @if($sConfig['has_atas_bawah'])
-                                            <th class="px-3 py-2 text-center text-xs font-bold text-slate-700 uppercase" colspan="2">Σ WELDING</th>
-                                        @endif
-                                        <th class="px-3 py-2 text-left text-xs font-bold text-slate-700 uppercase" rowspan="2">Q-POINT</th>
-                                        <th class="px-3 py-2 text-center text-xs font-bold text-slate-700 uppercase w-16" rowspan="2">
-                                            OK <span class="text-red-500">*</span>
-                                        </th>
-                                        <th class="px-3 py-2 text-center text-xs font-bold text-red-600 uppercase"
-                                            colspan="{{ count($ngTypes) }}">WELDING NG</th>
-                                        <th class="px-3 py-2 text-left text-xs font-bold text-slate-700 uppercase w-48" rowspan="2">STATUS / REMARKS</th>
-                                    </tr>
-                                    <tr class="bg-slate-50 border-b border-slate-200">
-                                        @if($sConfig['has_atas_bawah'])
-                                            <th class="px-3 py-2 text-center text-xs font-bold text-slate-700 uppercase w-16">ATAS</th>
-                                            <th class="px-3 py-2 text-center text-xs font-bold text-slate-700 uppercase w-16">BAWAH</th>
-                                        @endif
-                                        @foreach($ngTypes as $ngType)
-                                            <th class="px-3 py-2 text-center text-xs font-bold text-red-600 uppercase w-20">
-                                                {{ strtoupper($ngType) }}
-                                            </th>
-                                        @endforeach
-                                    </tr>
-                                @else
-                                    <tr class="bg-slate-50 border-b border-slate-200">
-                                        <th class="px-3 py-2 text-center text-xs font-bold text-slate-700 uppercase w-12">NO</th>
-                                        <th class="px-3 py-2 text-left text-xs font-bold text-slate-700 uppercase">ITEM CHECK</th>
-                                        <th class="px-3 py-2 text-left text-xs font-bold text-slate-700 uppercase">Q-POINT</th>
-                                        <th class="px-3 py-2 text-center text-xs font-bold text-slate-700 uppercase w-16">
-                                            OK <span class="text-red-500">*</span>
-                                        </th>
-                                        <th class="px-3 py-2 text-center text-xs font-bold text-slate-700 uppercase w-16">
-                                            NG <span class="text-red-500">*</span>
-                                        </th>
-                                        <th class="px-3 py-2 text-left text-xs font-bold text-slate-700 uppercase w-64">STATUS / REMARKS</th>
-                                    </tr>
-                                @endif
-                            </thead>
-
-                            <tbody class="divide-y divide-slate-100">
-                                @foreach($section->details as $index => $detail)
-                                    @php
-                                        $isCritical = $detail->is_critical;
-                                        $detailId   = $detail->id;
-                                    @endphp
-
+                        {{-- ─── Inspection Table ────────────────────── --}}
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead>
                                     @if($isWelding)
+                                        <tr class="bg-slate-50 border-b border-slate-200">
+                                            <th class="px-3 py-2 text-center text-xs font-bold text-slate-700 uppercase w-12" rowspan="2">NO</th>
+                                            <th class="px-3 py-2 text-left text-xs font-bold text-slate-700 uppercase" rowspan="2">ITEM CHECK</th>
+                                            @if($hasAtasBawah)
+                                                <th class="px-3 py-2 text-center text-xs font-bold text-slate-700 uppercase" colspan="2">Σ WELDING</th>
+                                            @endif
+                                            <th class="px-3 py-2 text-left text-xs font-bold text-slate-700 uppercase" rowspan="2">Q-POINT</th>
+                                            <th class="px-3 py-2 text-center text-xs font-bold text-slate-700 uppercase w-16" rowspan="2">
+                                                OK <span class="text-red-500">*</span>
+                                            </th>
+                                            <th class="px-3 py-2 text-center text-xs font-bold text-red-600 uppercase"
+                                                colspan="{{ count($ngTypes) }}">WELDING NG</th>
+                                            <th class="px-3 py-2 text-left text-xs font-bold text-slate-700 uppercase w-48" rowspan="2">STATUS / REMARKS</th>
+                                        </tr>
+                                        <tr class="bg-slate-50 border-b border-slate-200">
+                                            @if($hasAtasBawah)
+                                                <th class="px-3 py-2 text-center text-xs font-bold text-slate-700 uppercase w-16">ATAS</th>
+                                                <th class="px-3 py-2 text-center text-xs font-bold text-slate-700 uppercase w-16">BAWAH</th>
+                                            @endif
+                                            @foreach($ngTypes as $ngType)
+                                                <th class="px-3 py-2 text-center text-xs font-bold text-red-600 uppercase w-20">
+                                                    {{ strtoupper($ngType) }}
+                                                </th>
+                                            @endforeach
+                                        </tr>
+
+                                        @elseif($hasRepair)
+                                        {{-- Painting: 1 baris header saja, tanpa rowspan/colspan repair --}}
+                                        <tr class="bg-slate-50 border-b border-slate-200">
+                                            <th class="px-3 py-2 text-center text-xs font-bold text-slate-700 uppercase w-12">NO</th>
+                                            <th class="px-3 py-2 text-left text-xs font-bold text-slate-700 uppercase">ITEM CHECK</th>
+                                            <th class="px-3 py-2 text-center text-xs font-bold text-slate-700 uppercase w-16">
+                                                OK <span class="text-red-500">*</span>
+                                            </th>
+                                            @foreach($ngTypes as $ngType)
+                                                <th class="px-3 py-2 text-center text-xs font-bold text-red-600 uppercase w-20">
+                                                    {{ strtoupper($ngType) }}
+                                                </th>
+                                            @endforeach
+                                            <th class="px-3 py-2 text-center text-xs font-bold text-blue-600 uppercase w-24">REPAIR</th>
+                                            <th class="px-3 py-2 text-left text-xs font-bold text-slate-700 uppercase w-48">REMARKS</th>
+                                        </tr>
+
+
+
+                                    @else
+                                        <tr class="bg-slate-50 border-b border-slate-200">
+                                            <th class="px-3 py-2 text-center text-xs font-bold text-slate-700 uppercase w-12">NO</th>
+                                            <th class="px-3 py-2 text-left text-xs font-bold text-slate-700 uppercase">ITEM CHECK</th>
+                                            <th class="px-3 py-2 text-left text-xs font-bold text-slate-700 uppercase">Q-POINT</th>
+                                            <th class="px-3 py-2 text-center text-xs font-bold text-slate-700 uppercase w-16">
+                                                OK <span class="text-red-500">*</span>
+                                            </th>
+                                            <th class="px-3 py-2 text-center text-xs font-bold text-slate-700 uppercase w-16">
+                                                NG <span class="text-red-500">*</span>
+                                            </th>
+                                            <th class="px-3 py-2 text-left text-xs font-bold text-slate-700 uppercase w-64">STATUS / REMARKS</th>
+                                        </tr>
+                                    @endif
+                                </thead>
+
+                                <tbody class="divide-y divide-slate-100">
+                                    @foreach($section->details as $index => $detail)
                                         @php
-                                            $ngKeys = array_map(
-                                                fn($t) => 'ng_' . strtolower(str_replace(' ', '_', $t)),
-                                                $ngTypes
-                                            );
-
-                                            $isOkChecked  = (bool) ($checkResults[$detailId]['is_ok'] ?? false);
-                                            $anyNgChecked = false;
-
-                                            foreach ($ngKeys as $ngKey) {
-                                                if (($checkResults[$detailId][$ngKey] ?? 0) == 1) {
-                                                    $anyNgChecked = true;
-                                                    break;
-                                                }
-                                            }
-
-                                            if ($isOkChecked) $anyNgChecked = false;
-
-                                            // Atas / Bawah dari qpoint_code
-                                            $weldingAtas  = null;
-                                            $weldingBawah = null;
-                                            if ($sConfig['has_atas_bawah']) {
-                                                preg_match('/Atas\s*:\s*(\d+)/i',  $detail->qpoint_code ?? '', $mA);
-                                                preg_match('/Bawah\s*:\s*(\d+)/i', $detail->qpoint_code ?? '', $mB);
-                                                $weldingAtas  = $mA[1] ?? null;
-                                                $weldingBawah = $mB[1] ?? null;
-                                            }
+                                            $isCritical = $detail->is_critical;
+                                            $detailId   = $detail->id;
                                         @endphp
 
-                                        <tr wire:key="detail-{{ $detailId }}"
-                                            class="transition-colors {{ $isCritical ? 'bg-red-50' : 'bg-white hover:bg-slate-50' }}">
+                                        {{-- ═══ WELDING ROW ═══ --}}
+                                        @if($isWelding)
+                                            @php
+                                                $isOkChecked  = (bool) ($checkResults[$detailId]['is_ok'] ?? false);
+                                                $anyNgChecked = false;
+                                                foreach ($ngTypes as $t) {
+                                                    $k = 'ng_' . strtolower(str_replace(' ', '_', $t));
+                                                    if (($checkResults[$detailId][$k] ?? 0) == 1) { $anyNgChecked = true; break; }
+                                                }
+                                                if ($isOkChecked) $anyNgChecked = false;
 
-                                            {{-- NO --}}
-                                            <td class="px-3 py-2 text-center">
-                                                <span class="font-bold text-slate-700">{{ $index + 1 }}</span>
-                                                @if($isCritical)
-                                                    <span class="block text-xs text-red-500 font-bold">CRITICAL</span>
-                                                @endif
-                                            </td>
+                                                $weldingAtas  = null;
+                                                $weldingBawah = null;
+                                                if ($hasAtasBawah) {
+                                                    preg_match('/Atas\s*:\s*(\d+)/i',  $detail->qpoint_code ?? '', $mA);
+                                                    preg_match('/Bawah\s*:\s*(\d+)/i', $detail->qpoint_code ?? '', $mB);
+                                                    $weldingAtas  = $mA[1] ?? null;
+                                                    $weldingBawah = $mB[1] ?? null;
+                                                }
+                                            @endphp
 
-                                            {{-- Item Check --}}
-                                            <td class="px-3 py-2">
-                                                <p class="font-semibold text-slate-800 leading-tight">{{ $detail->item_name }}</p>
-                                                @if($detail->item_code)
-                                                    <span class="inline-block mt-0.5 text-xs text-slate-500 font-medium">{{ $detail->item_code }}</span>
-                                                @endif
-                                            </td>
+                                            <tr wire:key="detail-{{ $detailId }}"
+                                                class="transition-colors {{ $isCritical ? 'bg-red-50' : 'bg-white hover:bg-slate-50' }}">
 
-                                            {{-- Σ Welding Atas / Bawah --}}
-                                            @if($sConfig['has_atas_bawah'])
                                                 <td class="px-3 py-2 text-center">
-                                                    @if($weldingAtas)
-                                                        <span class="inline-flex items-center justify-center w-10 h-8 bg-slate-100 rounded font-bold text-slate-700 text-sm">
-                                                            {{ $weldingAtas }}
-                                                        </span>
-                                                    @else
-                                                        <span class="text-slate-400 text-sm">-</span>
+                                                    <span class="font-bold text-slate-700">{{ $index + 1 }}</span>
+                                                    @if($isCritical)<span class="block text-xs text-red-500 font-bold">CRITICAL</span>@endif
+                                                </td>
+
+                                                <td class="px-3 py-2">
+                                                    <p class="font-semibold text-slate-800 leading-tight">{{ $detail->item_name }}</p>
+                                                    @if($detail->item_code)
+                                                        <span class="text-xs text-slate-500">{{ $detail->item_code }}</span>
                                                     @endif
                                                 </td>
-                                                <td class="px-3 py-2 text-center">
-                                                    @if($weldingBawah)
-                                                        <span class="inline-flex items-center justify-center w-10 h-8 bg-slate-100 rounded font-bold text-slate-700 text-sm">
-                                                            {{ $weldingBawah }}
-                                                        </span>
+
+                                                @if($hasAtasBawah)
+                                                    <td class="px-3 py-2 text-center">
+                                                        @if($weldingAtas)
+                                                            <span class="inline-flex items-center justify-center w-10 h-8 bg-slate-100 rounded font-bold text-slate-700 text-sm">{{ $weldingAtas }}</span>
+                                                        @else
+                                                            <span class="text-slate-400">-</span>
+                                                        @endif
+                                                    </td>
+                                                    <td class="px-3 py-2 text-center">
+                                                        @if($weldingBawah)
+                                                            <span class="inline-flex items-center justify-center w-10 h-8 bg-slate-100 rounded font-bold text-slate-700 text-sm">{{ $weldingBawah }}</span>
+                                                        @else
+                                                            <span class="text-slate-400">-</span>
+                                                        @endif
+                                                    </td>
+                                                @endif
+
+                                                <td class="px-3 py-2">
+                                                    @if($detail->qpoint_name)
+                                                        <p class="text-xs text-slate-600 leading-relaxed">{{ $detail->qpoint_name }}</p>
                                                     @else
-                                                        <span class="text-slate-400 text-sm">-</span>
+                                                        <span class="text-slate-400">-</span>
                                                     @endif
                                                 </td>
-                                            @endif
 
-                                            {{-- Q-Point --}}
-                                            <td class="px-3 py-2">
-                                                @if($detail->qpoint_name)
-                                                    <p class="text-xs text-slate-600 leading-relaxed">{{ $detail->qpoint_name }}</p>
-                                                @else
-                                                    <span class="text-slate-400">-</span>
-                                                @endif
-                                            </td>
-
-                                            {{-- OK Checkbox --}}
-                                            <td class="px-3 py-2 text-center">
-                                                <label class="inline-flex items-center justify-center w-10 h-10 rounded-lg cursor-pointer transition-colors
-                                                    {{ $anyNgChecked ? 'bg-red-500' : ($isOkChecked ? 'bg-green-500' : 'bg-slate-100 hover:bg-slate-200') }}">
-                                                    <input type="checkbox"
-                                                           wire:model="checkResults.{{ $detailId }}.is_ok"
-                                                           wire:change="clearNgOnOk({{ $detailId }}, {{ $section->id }})"
-                                                           {{ $isOkChecked ? 'checked' : '' }}
-                                                           class="sr-only">
-                                                    @if($anyNgChecked)
-                                                        <svg class="w-5 h-5 text-white" stroke="currentColor" stroke-width="3" fill="none" viewBox="0 0 24 24">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                                        </svg>
-                                                    @elseif($isOkChecked)
-                                                        <svg class="w-5 h-5 text-white" stroke="currentColor" stroke-width="3" fill="none" viewBox="0 0 24 24">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                                                        </svg>
-                                                    @else
-                                                        <svg class="w-5 h-5 text-slate-400" stroke="currentColor" stroke-width="2" fill="none" viewBox="0 0 24 24">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14" />
-                                                        </svg>
-                                                    @endif
-                                                </label>
-                                            </td>
-
-                                            {{-- NG Checkboxes (dynamic per ng_types) --}}
-                                            @foreach($ngTypes as $ngType)
-                                                @php
-                                                    $key       = 'ng_' . strtolower(str_replace(' ', '_', $ngType));
-                                                    $ngChecked = !$isOkChecked && ($checkResults[$detailId][$key] ?? 0) == 1;
-                                                @endphp
                                                 <td class="px-3 py-2 text-center">
                                                     <label class="inline-flex items-center justify-center w-10 h-10 rounded-lg cursor-pointer transition-colors
-                                                        {{ $isOkChecked
-                                                            ? 'bg-slate-100 opacity-40 cursor-not-allowed'
-                                                            : ($ngChecked ? 'bg-red-500' : 'bg-red-50 hover:bg-red-100') }}">
+                                                        {{ $anyNgChecked ? 'bg-red-500' : ($isOkChecked ? 'bg-green-500' : 'bg-slate-100 hover:bg-slate-200') }}">
                                                         <input type="checkbox"
-                                                               wire:model="checkResults.{{ $detailId }}.{{ $key }}"
-                                                               wire:change="clearOkOnNg({{ $detailId }})"
-                                                               {{ $ngChecked  ? 'checked'  : '' }}
-                                                               {{ $isOkChecked ? 'disabled' : '' }}
-                                                               value="1"
+                                                               wire:model.live="checkResults.{{ $detailId }}.is_ok"
+                                                               wire:change="clearNgOnOk({{ $detailId }}, {{ $section->id }})"
                                                                class="sr-only">
-                                                        @if($ngChecked)
-                                                            <svg class="w-5 h-5 text-white" stroke="currentColor" stroke-width="3" fill="none" viewBox="0 0 24 24">
-                                                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                                            </svg>
+                                                        @if($anyNgChecked)
+                                                            <svg class="w-5 h-5 text-white" stroke="currentColor" stroke-width="3" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                                                        @elseif($isOkChecked)
+                                                            <svg class="w-5 h-5 text-white" stroke="currentColor" stroke-width="3" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
                                                         @else
-                                                            <svg class="w-5 h-5 {{ $isOkChecked ? 'text-slate-300' : 'text-red-300' }}"
-                                                                 stroke="currentColor" stroke-width="2.5" fill="none" viewBox="0 0 24 24">
-                                                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14" />
-                                                            </svg>
+                                                            <svg class="w-5 h-5 text-slate-400" stroke="currentColor" stroke-width="2" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14"/></svg>
                                                         @endif
                                                     </label>
                                                 </td>
-                                            @endforeach
 
-                                            {{-- Status / Remarks --}}
-                                            <td class="px-3 py-2">
-                                                <input type="text"
-                                                       wire:model.defer="checkResults.{{ $detailId }}.status"
-                                                       placeholder="Status / Remarks..."
-                                                       class="w-full px-2 py-1.5 rounded border border-slate-300 focus:border-slate-500 focus:ring-2 focus:ring-slate-200 transition-all outline-none text-sm bg-white">
-                                            </td>
+                                                @foreach($ngTypes as $ngType)
+                                                    @php
+                                                        $key       = 'ng_' . strtolower(str_replace(' ', '_', $ngType));
+                                                        $ngChecked = !$isOkChecked && ($checkResults[$detailId][$key] ?? 0) == 1;
+                                                    @endphp
+                                                    <td class="px-3 py-2 text-center">
+                                                        <label class="inline-flex items-center justify-center w-10 h-10 rounded-lg cursor-pointer transition-colors
+                                                            {{ $isOkChecked ? 'bg-slate-100 opacity-40 cursor-not-allowed' : ($ngChecked ? 'bg-red-500' : 'bg-red-50 hover:bg-red-100') }}">
+                                                            <input type="checkbox"
+                                                                   wire:model.live="checkResults.{{ $detailId }}.{{ $key }}"
+                                                                   wire:change="clearOkOnNg({{ $detailId }})"
+                                                                   {{ $isOkChecked ? 'disabled' : '' }}
+                                                                   value="1"
+                                                                   class="sr-only">
+                                                            @if($ngChecked)
+                                                                <svg class="w-5 h-5 text-white" stroke="currentColor" stroke-width="3" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                                                            @else
+                                                                <svg class="w-5 h-5 {{ $isOkChecked ? 'text-slate-300' : 'text-red-300' }}" stroke="currentColor" stroke-width="2.5" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14"/></svg>
+                                                            @endif
+                                                        </label>
+                                                    </td>
+                                                @endforeach
 
-                                        </tr>
+                                                <td class="px-3 py-2">
+                                                    <input type="text"
+                                                           wire:model.defer="checkResults.{{ $detailId }}.status"
+                                                           placeholder="Status / Remarks..."
+                                                           class="w-full px-2 py-1.5 rounded border border-slate-300 focus:border-slate-500 focus:ring-2 focus:ring-slate-200 transition-all outline-none text-sm bg-white">
+                                                </td>
+                                            </tr>
 
-                                    @else
-                                        {{-- ── Standard Row ───────────────────────────── --}}
-                                        @php
-                                            $isOk = isset($checkResults[$detailId]['result']) && $checkResults[$detailId]['result'] === 'ok';
-                                            $isNg = isset($checkResults[$detailId]['result']) && $checkResults[$detailId]['result'] === 'ng';
-                                        @endphp
+                                        {{-- ═══ PAINTING ROW ═══ --}}
+                                        @elseif($hasRepair)
+                                            @php
+                                                $isOkChecked  = (bool) ($checkResults[$detailId]['is_ok'] ?? false);
+                                                $anyNgChecked = false;
+                                                foreach ($ngTypes as $t) {
+                                                    $k = 'ng_' . strtolower(str_replace(' ', '_', $t));
+                                                    if (($checkResults[$detailId][$k] ?? 0) == 1) { $anyNgChecked = true; break; }
+                                                }
+                                                if ($isOkChecked) $anyNgChecked = false;
 
-                                        <tr x-data="{ unfilled: false, detailId: {{ $detailId }} }"
-                                            x-on:highlight-unfilled.window="unfilled = $event.detail.detailIds.includes(detailId)"
-                                            x-on:clear-highlight.window="unfilled = false"
-                                            :class="unfilled
-                                                ? 'bg-yellow-50 border-l-4 border-yellow-400'
-                                                : '{{ $isCritical ? 'bg-red-50 border-l-4 border-l-transparent' : 'bg-white hover:bg-slate-50 border-l-4 border-l-transparent' }}'"
-                                            class="transition-colors">
+                                                $repairValue    = $checkResults[$detailId]['repair'] ?? null;
+                                                $repairDisabled = $isOkChecked || !$anyNgChecked;
+                                            @endphp
 
-                                            <td class="px-3 py-2 text-center">
-                                                <span class="font-bold text-slate-700">{{ $index + 1 }}</span>
-                                                @if($isCritical)
-                                                    <span class="block text-xs text-red-500 font-bold">CRITICAL</span>
-                                                @endif
-                                            </td>
+                                            <tr wire:key="detail-{{ $detailId }}"
+                                                class="transition-colors {{ $isCritical ? 'bg-red-50' : 'bg-white hover:bg-slate-50' }}">
 
-                                            <td class="px-3 py-2">
-                                                <div>
+                                                <td class="px-3 py-2 text-center">
+                                                    <span class="font-bold text-slate-700">{{ $index + 1 }}</span>
+                                                    @if($isCritical)<span class="block text-xs text-red-500 font-bold">CRITICAL</span>@endif
+                                                </td>
+
+                                                <td class="px-3 py-2">
                                                     <p class="font-semibold text-slate-800 leading-tight">{{ $detail->item_name }}</p>
                                                     @if($detail->item_code)
-                                                        <span class="inline-block mt-0.5 text-xs text-slate-500 font-medium">{{ $detail->item_code }}</span>
+                                                        <span class="text-xs text-slate-500">{{ $detail->item_code }}</span>
                                                     @endif
-                                                    <span x-show="unfilled" x-cloak
-                                                          class="inline-flex items-center gap-1 mt-0.5 text-xs text-yellow-600 font-semibold">
-                                                        ⚠ Wajib diisi
-                                                    </span>
-                                                </div>
-                                            </td>
+                                                </td>
 
-                                            <td class="px-3 py-2">
-                                                @if($detail->qpoint_name)
-                                                    <p class="text-sm text-slate-700">{{ $detail->qpoint_name }}</p>
-                                                    @if($detail->qpoint_code)
-                                                        <span class="text-xs text-slate-500">{{ $detail->qpoint_code }}</span>
+                                                {{-- OK --}}
+                                                <td class="px-3 py-2 text-center">
+                                                    <label class="inline-flex items-center justify-center w-10 h-10 rounded-lg cursor-pointer transition-colors
+                                                        {{ $anyNgChecked ? 'bg-red-500' : ($isOkChecked ? 'bg-green-500' : 'bg-slate-100 hover:bg-slate-200') }}">
+                                                        <input type="checkbox"
+                                                               wire:model.live="checkResults.{{ $detailId }}.is_ok"
+                                                               wire:change="clearNgOnOk({{ $detailId }}, {{ $section->id }})"
+                                                               class="sr-only">
+                                                        @if($anyNgChecked)
+                                                            <svg class="w-5 h-5 text-white" stroke="currentColor" stroke-width="3" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                                                        @elseif($isOkChecked)
+                                                            <svg class="w-5 h-5 text-white" stroke="currentColor" stroke-width="3" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+                                                        @else
+                                                            <svg class="w-5 h-5 text-slate-400" stroke="currentColor" stroke-width="2" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14"/></svg>
+                                                        @endif
+                                                    </label>
+                                                </td>
+
+                                                {{-- NG Columns --}}
+                                                @foreach($ngTypes as $ngType)
+                                                    @php
+                                                        $key       = 'ng_' . strtolower(str_replace(' ', '_', $ngType));
+                                                        $ngChecked = !$isOkChecked && ($checkResults[$detailId][$key] ?? 0) == 1;
+                                                    @endphp
+                                                    <td class="px-3 py-2 text-center">
+                                                        <label class="inline-flex items-center justify-center w-10 h-10 rounded-lg cursor-pointer transition-colors
+                                                            {{ $isOkChecked ? 'bg-slate-100 opacity-40 cursor-not-allowed' : ($ngChecked ? 'bg-red-500' : 'bg-red-50 hover:bg-red-100') }}">
+                                                            <input type="checkbox"
+                                                                   wire:model.live="checkResults.{{ $detailId }}.{{ $key }}"
+                                                                   wire:change="clearOkOnNg({{ $detailId }})"
+                                                                   {{ $isOkChecked ? 'disabled' : '' }}
+                                                                   value="1"
+                                                                   class="sr-only">
+                                                            @if($ngChecked)
+                                                                <svg class="w-5 h-5 text-white" stroke="currentColor" stroke-width="3" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                                                            @else
+                                                                <svg class="w-5 h-5 {{ $isOkChecked ? 'text-slate-300' : 'text-red-300' }}" stroke="currentColor" stroke-width="2.5" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14"/></svg>
+                                                            @endif
+                                                        </label>
+                                                    </td>
+                                                @endforeach
+
+                                                {{-- REPAIR — 1 kolom radio, opsi dari repair_types --}}
+                                                <td class="px-3 py-2 text-center">
+                                                    <div class="flex flex-col items-center gap-1">
+                                                        @foreach($repairTypes as $repairOption)
+                                                            @php
+                                                                $optVal     = strtolower($repairOption);
+                                                                $isSelected = $repairValue === $optVal;
+                                                                $colorClass = $optVal === 'yes'
+                                                                    ? ($isSelected ? 'bg-blue-500 text-white' : 'bg-blue-50 text-blue-400 hover:bg-blue-100')
+                                                                    : ($isSelected ? 'bg-slate-500 text-white' : 'bg-slate-50 text-slate-400 hover:bg-slate-100');
+                                                            @endphp
+                                                            <label class="inline-flex items-center justify-center w-14 py-1 rounded-lg transition-colors text-xs font-bold
+                                                                {{ $repairDisabled
+                                                                    ? 'bg-slate-100 text-slate-300 cursor-not-allowed opacity-40'
+                                                                    : $colorClass . ' cursor-pointer' }}">
+                                                                <input type="radio"
+                                                                       wire:model.live="checkResults.{{ $detailId }}.repair"
+                                                                       value="{{ $optVal }}"
+                                                                       {{ $repairDisabled ? 'disabled' : '' }}
+                                                                       class="sr-only">
+                                                                {{ strtoupper($repairOption) }}
+                                                            </label>
+                                                        @endforeach
+                                                    </div>
+                                                </td>
+
+                                                {{-- Remarks --}}
+                                                <td class="px-3 py-2">
+                                                    <input type="text"
+                                                           wire:model.defer="checkResults.{{ $detailId }}.status"
+                                                           placeholder="Remarks..."
+                                                           class="w-full px-2 py-1.5 rounded border border-slate-300 focus:border-slate-500 focus:ring-2 focus:ring-slate-200 transition-all outline-none text-sm bg-white">
+                                                </td>
+                                            </tr>
+
+                                        {{-- ═══ STANDARD ROW ═══ --}}
+                                        @else
+                                            @php
+                                                $isOk = isset($checkResults[$detailId]['result']) && $checkResults[$detailId]['result'] === 'ok';
+                                                $isNg = isset($checkResults[$detailId]['result']) && $checkResults[$detailId]['result'] === 'ng';
+                                            @endphp
+
+                                            <tr x-data="{ unfilled: false, detailId: {{ $detailId }} }"
+                                                x-on:highlight-unfilled.window="unfilled = $event.detail.detailIds.includes(detailId)"
+                                                x-on:clear-highlight.window="unfilled = false"
+                                                :class="unfilled
+                                                    ? 'bg-yellow-50 border-l-4 border-yellow-400'
+                                                    : '{{ $isCritical ? 'bg-red-50 border-l-4 border-l-transparent' : 'bg-white hover:bg-slate-50 border-l-4 border-l-transparent' }}'"
+                                                class="transition-colors">
+
+                                                <td class="px-3 py-2 text-center">
+                                                    <span class="font-bold text-slate-700">{{ $index + 1 }}</span>
+                                                    @if($isCritical)<span class="block text-xs text-red-500 font-bold">CRITICAL</span>@endif
+                                                </td>
+
+                                                <td class="px-3 py-2">
+                                                    <div>
+                                                        <p class="font-semibold text-slate-800 leading-tight">{{ $detail->item_name }}</p>
+                                                        @if($detail->item_code)
+                                                            <span class="inline-block mt-0.5 text-xs text-slate-500 font-medium">{{ $detail->item_code }}</span>
+                                                        @endif
+                                                        <span x-show="unfilled" x-cloak
+                                                              class="inline-flex items-center gap-1 mt-0.5 text-xs text-yellow-600 font-semibold">
+                                                            ⚠ Wajib diisi
+                                                        </span>
+                                                    </div>
+                                                </td>
+
+                                                <td class="px-3 py-2">
+                                                    @if($detail->qpoint_name)
+                                                        <p class="text-sm text-slate-700">{{ $detail->qpoint_name }}</p>
+                                                        @if($detail->qpoint_code)
+                                                            <span class="text-xs text-slate-500">{{ $detail->qpoint_code }}</span>
+                                                        @endif
+                                                    @else
+                                                        <span class="text-slate-400">-</span>
                                                     @endif
-                                                @else
-                                                    <span class="text-slate-400">-</span>
-                                                @endif
-                                            </td>
+                                                </td>
 
-                                            {{-- OK Radio --}}
-                                            <td class="px-3 py-2 text-center w-20">
-                                                <div class="flex justify-center items-center">
-                                                    <label class="p-2 rounded-lg cursor-pointer transition-all {{ $isOk ? 'bg-green-500 shadow-sm' : 'bg-green-50 hover:bg-green-100' }}">
-                                                        <input type="radio"
-                                                               name="check_{{ $detailId }}"
-                                                               wire:model.defer="checkResults.{{ $detailId }}.result"
-                                                               x-on:change="unfilled = false"
-                                                               value="ok"
-                                                               class="w-5 h-5 border-slate-300 focus:ring-0 cursor-pointer {{ $isOk ? 'accent-white' : 'text-green-600' }}">
-                                                    </label>
-                                                </div>
-                                            </td>
+                                                <td class="px-3 py-2 text-center w-20">
+                                                    <div class="flex justify-center items-center">
+                                                        <label class="p-2 rounded-lg cursor-pointer transition-all {{ $isOk ? 'bg-green-500 shadow-sm' : 'bg-green-50 hover:bg-green-100' }}">
+                                                            <input type="radio"
+                                                                   name="check_{{ $detailId }}"
+                                                                   wire:model.live="checkResults.{{ $detailId }}.result"
+                                                                   x-on:change="unfilled = false"
+                                                                   value="ok"
+                                                                   class="w-5 h-5 border-slate-300 focus:ring-0 cursor-pointer {{ $isOk ? 'accent-white' : 'text-green-600' }}">
+                                                        </label>
+                                                    </div>
+                                                </td>
 
-                                            {{-- NG Radio --}}
-                                            <td class="px-3 py-2 text-center w-20">
-                                                <div class="flex justify-center items-center">
-                                                    <label class="p-2 rounded-lg cursor-pointer transition-all {{ $isNg ? 'bg-red-500 shadow-sm' : 'bg-red-50 hover:bg-red-100' }}">
-                                                        <input type="radio"
-                                                               name="check_{{ $detailId }}"
-                                                               wire:model.defer="checkResults.{{ $detailId }}.result"
-                                                               x-on:change="unfilled = false"
-                                                               value="ng"
-                                                               class="w-5 h-5 border-slate-300 focus:ring-0 cursor-pointer {{ $isNg ? 'accent-white' : 'text-red-600' }}">
-                                                    </label>
-                                                </div>
-                                            </td>
+                                                <td class="px-3 py-2 text-center w-20">
+                                                    <div class="flex justify-center items-center">
+                                                        <label class="p-2 rounded-lg cursor-pointer transition-all {{ $isNg ? 'bg-red-500 shadow-sm' : 'bg-red-50 hover:bg-red-100' }}">
+                                                            <input type="radio"
+                                                                   name="check_{{ $detailId }}"
+                                                                   wire:model.live="checkResults.{{ $detailId }}.result"
+                                                                   x-on:change="unfilled = false"
+                                                                   value="ng"
+                                                                   class="w-5 h-5 border-slate-300 focus:ring-0 cursor-pointer {{ $isNg ? 'accent-white' : 'text-red-600' }}">
+                                                        </label>
+                                                    </div>
+                                                </td>
 
-                                            {{-- Status / Remarks --}}
-                                            <td class="px-3 py-2">
-                                                <input type="text"
-                                                       wire:model.defer="checkResults.{{ $detailId }}.status"
-                                                       placeholder="Status / Remarks..."
-                                                       class="w-full px-2 py-1.5 rounded border border-slate-300 focus:border-slate-500 focus:ring-2 focus:ring-slate-200 transition-all outline-none text-sm bg-white">
-                                            </td>
+                                                <td class="px-3 py-2">
+                                                    <input type="text"
+                                                           wire:model.defer="checkResults.{{ $detailId }}.status"
+                                                           placeholder="Status / Remarks..."
+                                                           class="w-full px-2 py-1.5 rounded border border-slate-300 focus:border-slate-500 focus:ring-2 focus:ring-slate-200 transition-all outline-none text-sm bg-white">
+                                                </td>
+                                            </tr>
+                                        @endif
 
-                                        </tr>
-                                    @endif
+                                    @endforeach
+                                </tbody>
 
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
+                            </table>
+                        </div>
 
                     @endif {{-- end expandedSections --}}
 

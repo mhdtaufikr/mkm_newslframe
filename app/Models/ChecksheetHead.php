@@ -3,7 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;  // ← pastikan ini
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ChecksheetHead extends Model
@@ -21,10 +21,9 @@ class ChecksheetHead extends Model
     ];
 
     protected $casts = [
-        'is_active' => 'boolean',
+        'is_active' => 'boolean', // ← ini yang penting
+        'order'     => 'integer',
     ];
-
-    // ─── Relations ───────────────────────────────────────────
 
     public function defaultFormat(): BelongsTo
     {

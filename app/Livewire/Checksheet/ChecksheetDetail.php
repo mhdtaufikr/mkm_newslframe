@@ -16,17 +16,14 @@ class ChecksheetDetail extends Component
     public $sections;
     public $expandedSections = [];
 
-    // Image modal
     public $showImageModal = false;
     public $selectedImage  = null;
 
-    // Form data
     public $nama;
     public $tanggal;
     public $serial_number;
     public $checkResults = [];
 
-    // Format config per section (key = section_id)
     public $sectionFormats = [];
 
     // ─────────────────────────────────────────────
@@ -75,40 +72,40 @@ class ChecksheetDetail extends Component
         $this->serial_number = $this->generateSerialNumber();
 
         foreach ($this->sections as $section) {
-            // Expand semua section by default
             $this->expandedSections[] = $section->id;
 
-            // Resolve format untuk section ini
-            $format  = $section->resolvedFormat();
-            $config  = $format?->config ?? [];
+            $format = $section->resolvedFormat();
+            $config = $format?->config ?? [];
 
-            $inputType = $config['input_type'] ?? 'standard';
-            $ngTypes   = $config['ng_types'] ?? [];
-
-            // Simpan config per section biar bisa diakses di blade & submit
             $this->sectionFormats[$section->id] = [
-                'input_type'      => $inputType,
-                'ng_types'        => $ngTypes,
-                'has_atas_bawah'  => $config['has_atas_bawah'] ?? false,
-                'store_breakdown' => $config['store_breakdown'] ?? false,
+                'input_type'      => $config['input_type']     ?? 'standard',
+                'ng_types'        => $config['ng_types']        ?? [],
+                'has_atas_bawah'  => $config['has_atas_bawah']  ?? false,
+                'store_breakdown' => $config['store_breakdown']  ?? false,
+                'repair_types'    => $config['repair_types']     ?? [],
             ];
 
-            // Init checkResults per detail
+            $ngTypes     = $config['ng_types']    ?? [];
+            $repairTypes = $config['repair_types'] ?? [];
+            $hasRepair   = count($repairTypes) > 0;
+
             foreach ($section->details as $detail) {
-                if ($inputType === 'welding') {
-                    $result = [
-                        'is_ok'  => false,
-                        'status' => null,
-                    ];
-                    foreach ($ngTypes as $ngType) {
-                        $key          = 'ng_' . strtolower(str_replace(' ', '_', $ngType));
+                if (!empty($ngTypes)) {
+                    $result = ['is_ok' => false, 'status' => null];
+
+                    foreach ($ngTypes as $t) {
+                        $key = 'ng_' . strtolower(str_replace(' ', '_', $t));
                         $result[$key] = null;
                     }
+
+                    // repair_types = ["YES","NO"] → opsi jawaban, bukan nama kolom
+                    // cukup 1 key 'repair' dengan value null/'yes'/'no'
+                    if ($hasRepair) {
+                        $result['repair'] = null;
+                    }
+
                 } else {
-                    $result = [
-                        'result' => null,
-                        'status' => '',
-                    ];
+                    $result = ['result' => null, 'status' => ''];
                 }
 
                 $this->checkResults[$detail->id] = $result;
@@ -117,7 +114,7 @@ class ChecksheetDetail extends Component
     }
 
     // ─────────────────────────────────────────────
-    // Helper: Ambil format config untuk section
+    // Helper
     // ─────────────────────────────────────────────
 
     private function getSectionConfig(int $sectionId): array
@@ -127,25 +124,8 @@ class ChecksheetDetail extends Component
             'ng_types'        => [],
             'has_atas_bawah'  => false,
             'store_breakdown' => false,
+            'repair_types'    => [],
         ];
-    }
-
-    // ─────────────────────────────────────────────
-    // Toggle OK (Welding)
-    // ─────────────────────────────────────────────
-
-    public function toggleOk(int $detailId, int $sectionId): void
-    {
-        $current = $this->checkResults[$detailId]['is_ok'] ?? false;
-        $this->checkResults[$detailId]['is_ok'] = !$current;
-
-        if ($this->checkResults[$detailId]['is_ok']) {
-            $ngTypes = $this->getSectionConfig($sectionId)['ng_types'];
-            foreach ($ngTypes as $ngType) {
-                $key = 'ng_' . strtolower(str_replace(' ', '_', $ngType));
-                $this->checkResults[$detailId][$key] = 0;
-            }
-        }
     }
 
     // ─────────────────────────────────────────────
@@ -174,6 +154,31 @@ class ChecksheetDetail extends Component
     }
 
     // ─────────────────────────────────────────────
+    // Clear Helpers
+    // ─────────────────────────────────────────────
+
+    public function clearNgOnOk(int $detailId, int $sectionId): void
+    {
+        $config  = $this->getSectionConfig($sectionId);
+        $ngTypes = $config['ng_types'];
+
+        foreach ($ngTypes as $type) {
+            $key = 'ng_' . strtolower(str_replace(' ', '_', $type));
+            $this->checkResults[$detailId][$key] = null;
+        }
+
+        // Reset 1 key repair (bukan loop repair_types)
+        if (!empty($config['repair_types'])) {
+            $this->checkResults[$detailId]['repair'] = null;
+        }
+    }
+
+    public function clearOkOnNg(int $detailId): void
+    {
+        $this->checkResults[$detailId]['is_ok'] = false;
+    }
+
+    // ─────────────────────────────────────────────
     // Submit
     // ─────────────────────────────────────────────
 
@@ -187,30 +192,34 @@ class ChecksheetDetail extends Component
             'serial_number.required' => 'Serial number harus diisi',
         ]);
 
-        // ── Validasi unfilled per section format ──────────────
+        // ── Validasi unfilled ──────────────────────────────────
         $unfilledItems = [];
 
         foreach ($this->sections as $section) {
-            $config    = $this->getSectionConfig($section->id);
-            $inputType = $config['input_type'];
-            $ngTypes   = $config['ng_types'];
+            $config  = $this->getSectionConfig($section->id);
+            $ngTypes = $config['ng_types'];
 
             foreach ($section->details as $detail) {
                 $data = $this->checkResults[$detail->id] ?? [];
 
-                if ($inputType === 'welding') {
-                    $isManualOk = (bool) ($data['is_ok'] ?? false);
-                    $ngTotal    = 0;
-                    foreach ($ngTypes as $ngType) {
-                        $key      = 'ng_' . strtolower(str_replace(' ', '_', $ngType));
-                        $ngTotal += (int) ($data[$key] ?? 0);
+                if (!empty($ngTypes)) {
+                    $isOk     = (bool) ($data['is_ok'] ?? false);
+                    $hasAnyNg = false;
+
+                    foreach ($ngTypes as $t) {
+                        $key = 'ng_' . strtolower(str_replace(' ', '_', $t));
+                        if (!empty($data[$key])) {
+                            $hasAnyNg = true;
+                            break;
+                        }
                     }
-                    if (!$isManualOk && $ngTotal === 0) {
-                        $unfilledItems[] = (int) $detail->id;
+
+                    if (!$isOk && !$hasAnyNg) {
+                        $unfilledItems[] = $detail->id;
                     }
                 } else {
                     if (empty($data['result'])) {
-                        $unfilledItems[] = (int) $detail->id;
+                        $unfilledItems[] = $detail->id;
                     }
                 }
             }
@@ -249,12 +258,15 @@ class ChecksheetDetail extends Component
                 $config         = $this->getSectionConfig($section->id);
                 $inputType      = $config['input_type'];
                 $ngTypes        = $config['ng_types'];
+                $repairTypes    = $config['repair_types'] ?? [];
                 $storeBreakdown = $config['store_breakdown'];
+                $hasRepair      = count($repairTypes) > 0;
 
                 foreach ($section->details as $detail) {
                     $data = $this->checkResults[$detail->id] ?? [];
 
                     if ($inputType === 'welding') {
+                        // ── Welding ──────────────────────────────
                         $isManualOk  = (bool) ($data['is_ok'] ?? false);
                         $ngBreakdown = [];
                         $ngTotal     = 0;
@@ -278,12 +290,39 @@ class ChecksheetDetail extends Component
                             ]) : null,
                         ]);
 
-                    } else {
+                    } elseif ($hasRepair) {
+                        // ── Painting ─────────────────────────────
+                        $isOk        = (bool) ($data['is_ok'] ?? false);
+                        $ngBreakdown = [];
+                        $ngTotal     = 0;
+
+                        foreach ($ngTypes as $ngType) {
+                            $key                  = 'ng_' . strtolower(str_replace(' ', '_', $ngType));
+                            $val                  = (int) ($data[$key] ?? 0);
+                            $ngBreakdown[$ngType] = $val;
+                            $ngTotal             += $val;
+                        }
+
                         ChecksheetInspectionResult::create([
                             'checksheet_inspection_id' => $inspection->id,
                             'checksheet_section_id'    => $detail->checksheet_section_id,
                             'checksheet_detail_id'     => $detail->id,
-                            'result'                   => $data['result'],
+                            'result'                   => $isOk ? 'ok' : ($ngTotal > 0 ? 'ng' : 'ok'),
+                            'status'                   => $data['status'] ?? null,
+                            'result_data'              => json_encode([
+                                'ng_breakdown' => $ngBreakdown,
+                                'ng_total'     => $ngTotal,
+                                'repair'       => $data['repair'] ?? null, // 'yes'/'no'/null
+                            ]),
+                        ]);
+
+                    } else {
+                        // ── Standard ─────────────────────────────
+                        ChecksheetInspectionResult::create([
+                            'checksheet_inspection_id' => $inspection->id,
+                            'checksheet_section_id'    => $detail->checksheet_section_id,
+                            'checksheet_detail_id'     => $detail->id,
+                            'result'                   => $data['result'] ?? null,
                             'status'                   => $data['status'] ?? null,
                             'result_data'              => null,
                         ]);
@@ -310,24 +349,6 @@ class ChecksheetDetail extends Component
             DB::rollBack();
             session()->flash('error', 'Terjadi kesalahan: ' . $e->getMessage());
         }
-    }
-
-    // ─────────────────────────────────────────────
-    // Clear Helpers
-    // ─────────────────────────────────────────────
-
-    public function clearNgOnOk(int $detailId, int $sectionId): void
-    {
-        $ngTypes = $this->getSectionConfig($sectionId)['ng_types'];
-        foreach ($ngTypes as $type) {
-            $key = 'ng_' . strtolower(str_replace(' ', '_', $type));
-            $this->checkResults[$detailId][$key] = null;
-        }
-    }
-
-    public function clearOkOnNg(int $detailId): void
-    {
-        $this->checkResults[$detailId]['is_ok'] = false;
     }
 
     // ─────────────────────────────────────────────
