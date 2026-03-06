@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;  // ← pastikan ini
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ChecksheetHead extends Model
@@ -14,35 +15,25 @@ class ChecksheetHead extends Model
         'revision',
         'document_number',
         'process_name',
+        'default_format_id',
         'is_active',
         'order',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
-        'order' => 'integer',
     ];
 
+    // ─── Relations ───────────────────────────────────────────
 
-    public function scopeActive($query)
+    public function defaultFormat(): BelongsTo
     {
-        return $query->where('is_active', true);
-    }
-    public function sections()
-    {
-        return $this->hasMany(ChecksheetSection::class, 'checksheet_head_id');
+        return $this->belongsTo(ChecksheetFormat::class, 'default_format_id');
     }
 
-    public function details()
+    public function sections(): HasMany
     {
-        return $this->hasMany(ChecksheetDetail::class, 'checksheet_head_id');
+        return $this->hasMany(ChecksheetSection::class, 'checksheet_head_id')
+                    ->orderBy('order');
     }
-    public function inspections()
-{
-    return $this->hasMany(ChecksheetInspection::class);
-}
-
-
-
-
 }

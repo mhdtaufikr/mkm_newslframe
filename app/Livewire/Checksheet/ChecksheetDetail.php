@@ -24,8 +24,10 @@ class ChecksheetDetail extends Component
     public $nama;
     public $tanggal;
     public $serial_number;
-    public $checkResults   = [];
-    public $weldingNgTypes = [];
+    public $checkResults = [];
+
+    // Format config per section (key = section_id)
+    public $sectionFormats = [];
 
     // ─────────────────────────────────────────────
     // Serial Number Generator
@@ -61,69 +63,85 @@ class ChecksheetDetail extends Component
 
     public function mount($id): void
     {
-        $this->checksheet  = ChecksheetHead::with(['sections.details'])->findOrFail($id);
-        $this->sections    = $this->checksheet->sections;
-        $this->tanggal     = date('Y-m-d');
-        $this->nama        = auth()->user()->name;
+        $this->checksheet = ChecksheetHead::with([
+            'sections.details',
+            'sections.format',
+            'defaultFormat',
+        ])->findOrFail($id);
+
+        $this->sections      = $this->checksheet->sections;
+        $this->tanggal       = date('Y-m-d');
+        $this->nama          = auth()->user()->name;
         $this->serial_number = $this->generateSerialNumber();
 
         foreach ($this->sections as $section) {
+            // Expand semua section by default
             $this->expandedSections[] = $section->id;
-        }
 
-        $isWelding = $this->checksheet->process_name === 'Welding';
+            // Resolve format untuk section ini
+            $format  = $section->resolvedFormat();
+            $config  = $format?->config ?? [];
 
-        if ($isWelding) {
-            $maxNgTypes = [];
-            foreach ($this->sections as $section) {
-                foreach ($section->details as $detail) {
-                    if ($detail->qpoint_name) {
-                        $parsed = array_map('trim', explode(',', $detail->qpoint_name));
-                        if (count($parsed) > count($maxNgTypes)) {
-                            $maxNgTypes = $parsed;
-                        }
-                    }
-                }
-            }
-            $this->weldingNgTypes = !empty($maxNgTypes)
-                ? $maxNgTypes
-                : ['Uncomplete', 'Under Cut', 'Blow Hole', 'Spatter', 'Others'];
-        }
+            $inputType = $config['input_type'] ?? 'standard';
+            $ngTypes   = $config['ng_types'] ?? [];
 
-        foreach ($this->sections as $section) {
+            // Simpan config per section biar bisa diakses di blade & submit
+            $this->sectionFormats[$section->id] = [
+                'input_type'      => $inputType,
+                'ng_types'        => $ngTypes,
+                'has_atas_bawah'  => $config['has_atas_bawah'] ?? false,
+                'store_breakdown' => $config['store_breakdown'] ?? false,
+            ];
+
+            // Init checkResults per detail
             foreach ($section->details as $detail) {
-                if ($isWelding) {
-                    // ✅ is_ok ditambah ke initial state
-                    $result = ['status' => null, 'is_ok' => false];
-
-                    foreach ($this->weldingNgTypes as $ngType) {
+                if ($inputType === 'welding') {
+                    $result = [
+                        'is_ok'  => false,
+                        'status' => null,
+                    ];
+                    foreach ($ngTypes as $ngType) {
                         $key          = 'ng_' . strtolower(str_replace(' ', '_', $ngType));
                         $result[$key] = null;
                     }
-
-                    $this->checkResults[$detail->id] = $result;
                 } else {
-                    $this->checkResults[$detail->id] = [
+                    $result = [
                         'result' => null,
                         'status' => '',
                     ];
                 }
+
+                $this->checkResults[$detail->id] = $result;
             }
         }
+    }
+
+    // ─────────────────────────────────────────────
+    // Helper: Ambil format config untuk section
+    // ─────────────────────────────────────────────
+
+    private function getSectionConfig(int $sectionId): array
+    {
+        return $this->sectionFormats[$sectionId] ?? [
+            'input_type'      => 'standard',
+            'ng_types'        => [],
+            'has_atas_bawah'  => false,
+            'store_breakdown' => false,
+        ];
     }
 
     // ─────────────────────────────────────────────
     // Toggle OK (Welding)
     // ─────────────────────────────────────────────
 
-    public function toggleOk(int $detailId): void
+    public function toggleOk(int $detailId, int $sectionId): void
     {
         $current = $this->checkResults[$detailId]['is_ok'] ?? false;
         $this->checkResults[$detailId]['is_ok'] = !$current;
 
-        // Kalau di-OK → reset semua NG ke 0
         if ($this->checkResults[$detailId]['is_ok']) {
-            foreach ($this->weldingNgTypes as $ngType) {
+            $ngTypes = $this->getSectionConfig($sectionId)['ng_types'];
+            foreach ($ngTypes as $ngType) {
                 $key = 'ng_' . strtolower(str_replace(' ', '_', $ngType));
                 $this->checkResults[$detailId][$key] = 0;
             }
@@ -169,37 +187,42 @@ class ChecksheetDetail extends Component
             'serial_number.required' => 'Serial number harus diisi',
         ]);
 
-        $isWelding     = strtolower(trim($this->checksheet->process_name)) === 'welding';
+        // ── Validasi unfilled per section format ──────────────
         $unfilledItems = [];
 
-        // ✅ Populate $unfilledItems sesuai tipe process
-        if ($isWelding) {
-            foreach ($this->checkResults as $detailId => $data) {
-                $isManualOk = (bool) ($data['is_ok'] ?? false);
-                $ngTotal    = 0;
-                foreach ($this->weldingNgTypes as $ngType) {
-                    $key      = 'ng_' . strtolower(str_replace(' ', '_', $ngType));
-                    $ngTotal += (int) ($data[$key] ?? 0);
-                }
-                if (!$isManualOk && $ngTotal === 0) {
-                    $unfilledItems[] = (int) $detailId;
-                }
-            }
-        } else {
-            foreach ($this->checkResults as $detailId => $data) {
-                if (empty($data['result'])) {
-                    $unfilledItems[] = (int) $detailId;
+        foreach ($this->sections as $section) {
+            $config    = $this->getSectionConfig($section->id);
+            $inputType = $config['input_type'];
+            $ngTypes   = $config['ng_types'];
+
+            foreach ($section->details as $detail) {
+                $data = $this->checkResults[$detail->id] ?? [];
+
+                if ($inputType === 'welding') {
+                    $isManualOk = (bool) ($data['is_ok'] ?? false);
+                    $ngTotal    = 0;
+                    foreach ($ngTypes as $ngType) {
+                        $key      = 'ng_' . strtolower(str_replace(' ', '_', $ngType));
+                        $ngTotal += (int) ($data[$key] ?? 0);
+                    }
+                    if (!$isManualOk && $ngTotal === 0) {
+                        $unfilledItems[] = (int) $detail->id;
+                    }
+                } else {
+                    if (empty($data['result'])) {
+                        $unfilledItems[] = (int) $detail->id;
+                    }
                 }
             }
         }
 
-        // ✅ Blok submit kalau ada yang belum diisi
         if (!empty($unfilledItems)) {
             $this->dispatch('highlight-unfilled', detailIds: $unfilledItems);
             session()->flash('error', count($unfilledItems) . ' item belum diisi. Semua item wajib di-OK atau diisi NG.');
             return;
         }
 
+        // ── Cek duplikat serial number ─────────────────────────
         $serialExists = ChecksheetInspection::where('checksheet_head_id', $this->checksheet->id)
             ->where('serial_number', $this->serial_number)
             ->exists();
@@ -208,6 +231,7 @@ class ChecksheetDetail extends Component
             $this->serial_number = $this->generateSerialNumber();
         }
 
+        // ── Simpan ke database ─────────────────────────────────
         DB::beginTransaction();
         try {
             $inspection = ChecksheetInspection::create([
@@ -221,46 +245,52 @@ class ChecksheetDetail extends Component
 
             $savedCount = 0;
 
-            foreach ($this->checkResults as $detailId => $data) {
-                $detail = ChecksheetDetailModel::find($detailId);
-                if (!$detail) continue;
+            foreach ($this->sections as $section) {
+                $config         = $this->getSectionConfig($section->id);
+                $inputType      = $config['input_type'];
+                $ngTypes        = $config['ng_types'];
+                $storeBreakdown = $config['store_breakdown'];
 
-                if ($isWelding) {
-                    $isManualOk  = (bool) ($data['is_ok'] ?? false);
-                    $ngBreakdown = [];
-                    $ngTotal     = 0;
+                foreach ($section->details as $detail) {
+                    $data = $this->checkResults[$detail->id] ?? [];
 
-                    foreach ($this->weldingNgTypes as $ngType) {
-                        $key                  = 'ng_' . strtolower(str_replace(' ', '_', $ngType));
-                        $val                  = (int) ($data[$key] ?? 0);
-                        $ngBreakdown[$ngType] = $val;
-                        $ngTotal             += $val;
+                    if ($inputType === 'welding') {
+                        $isManualOk  = (bool) ($data['is_ok'] ?? false);
+                        $ngBreakdown = [];
+                        $ngTotal     = 0;
+
+                        foreach ($ngTypes as $ngType) {
+                            $key                  = 'ng_' . strtolower(str_replace(' ', '_', $ngType));
+                            $val                  = (int) ($data[$key] ?? 0);
+                            $ngBreakdown[$ngType] = $val;
+                            $ngTotal             += $val;
+                        }
+
+                        ChecksheetInspectionResult::create([
+                            'checksheet_inspection_id' => $inspection->id,
+                            'checksheet_section_id'    => $detail->checksheet_section_id,
+                            'checksheet_detail_id'     => $detail->id,
+                            'result'                   => $ngTotal > 0 ? 'ng' : 'ok',
+                            'status'                   => $data['status'] ?? null,
+                            'result_data'              => $storeBreakdown ? json_encode([
+                                'ng_breakdown' => $ngBreakdown,
+                                'ng_total'     => $ngTotal,
+                            ]) : null,
+                        ]);
+
+                    } else {
+                        ChecksheetInspectionResult::create([
+                            'checksheet_inspection_id' => $inspection->id,
+                            'checksheet_section_id'    => $detail->checksheet_section_id,
+                            'checksheet_detail_id'     => $detail->id,
+                            'result'                   => $data['result'],
+                            'status'                   => $data['status'] ?? null,
+                            'result_data'              => null,
+                        ]);
                     }
 
-                    ChecksheetInspectionResult::create([
-                        'checksheet_inspection_id' => $inspection->id,
-                        'checksheet_section_id'    => $detail->checksheet_section_id,
-                        'checksheet_detail_id'     => $detailId,
-                        'result'                   => $ngTotal > 0 ? 'ng' : 'ok',
-                        'status'                   => $data['status'] ?? null,
-                        'result_data'              => json_encode([
-                            'ng_breakdown' => $ngBreakdown,
-                            'ng_total'     => $ngTotal,
-                        ]),
-                    ]);
-
-                } else {
-                    ChecksheetInspectionResult::create([
-                        'checksheet_inspection_id' => $inspection->id,
-                        'checksheet_section_id'    => $detail->checksheet_section_id,
-                        'checksheet_detail_id'     => $detailId,
-                        'result'                   => $data['result'],
-                        'status'                   => $data['status'] ?? null,
-                        'result_data'              => null,
-                    ]);
+                    $savedCount++;
                 }
-
-                $savedCount++;
             }
 
             $inspection->update([
@@ -273,21 +303,23 @@ class ChecksheetDetail extends Component
 
             DB::commit();
 
-            session()->flash('success', "✅ Inspeksi berhasil disimpan! Total: {$savedCount} items");
+            session()->flash('success', "Inspeksi berhasil disimpan! Total {$savedCount} items");
             return redirect()->route('home.index');
 
         } catch (\Exception $e) {
-            DB::rollback();
+            DB::rollBack();
             session()->flash('error', 'Terjadi kesalahan: ' . $e->getMessage());
         }
     }
 
+    // ─────────────────────────────────────────────
+    // Clear Helpers
+    // ─────────────────────────────────────────────
 
-
-    public function clearNgOnOk(int $detailId): void
+    public function clearNgOnOk(int $detailId, int $sectionId): void
     {
-        // Saat OK di-check, clear semua NG key
-        foreach ($this->weldingNgTypes as $type) {
+        $ngTypes = $this->getSectionConfig($sectionId)['ng_types'];
+        foreach ($ngTypes as $type) {
             $key = 'ng_' . strtolower(str_replace(' ', '_', $type));
             $this->checkResults[$detailId][$key] = null;
         }
@@ -295,10 +327,8 @@ class ChecksheetDetail extends Component
 
     public function clearOkOnNg(int $detailId): void
     {
-        // Saat salah satu NG di-check, clear OK
         $this->checkResults[$detailId]['is_ok'] = false;
     }
-
 
     // ─────────────────────────────────────────────
     // Render
