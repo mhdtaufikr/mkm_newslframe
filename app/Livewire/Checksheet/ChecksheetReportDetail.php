@@ -14,7 +14,7 @@ class ChecksheetReportDetail extends Component
         $this->inspection = ChecksheetInspection::with([
             'checksheetHead',
             'results.detail',
-            'results.section'
+            'results.section',
         ])->findOrFail($id);
     }
 
@@ -22,30 +22,38 @@ class ChecksheetReportDetail extends Component
     {
         $sections = $this->inspection->results->groupBy('checksheet_section_id');
 
-        // ✅ Cek apakah inspeksi ini welding (dari hasil pertama yang punya result_data)
-        $isWelding = $this->inspection->results->contains(
-            fn($r) => !is_null($r->result_data)
-        );
+        // Deteksi tipe per section berdasarkan result_data
+        $sectionMeta = [];
 
-        // ✅ Ambil NG types dari result_data pertama yang ada
-        $weldingNgTypes = [];
-        if ($isWelding) {
-            $firstWithData = $this->inspection->results->first(
-                fn($r) => !is_null($r->result_data)
-            );
-            if ($firstWithData) {
-                $decoded = json_decode($firstWithData->result_data, true);
-                $weldingNgTypes = array_keys($decoded['ng_breakdown'] ?? []);
+        foreach ($sections as $sectionId => $results) {
+            $firstWithData = $results->first(fn($r) => !is_null($r->result_data));
+            $decoded       = $firstWithData ? json_decode($firstWithData->result_data, true) : null;
+
+            $hasNgBreakdown = !empty($decoded['ng_breakdown']);
+            $hasRepair      = array_key_exists('repair', $decoded ?? []);
+
+            if ($hasRepair) {
+                $type    = 'painting';
+                $ngTypes = array_keys($decoded['ng_breakdown'] ?? []);
+            } elseif ($hasNgBreakdown) {
+                $type    = 'welding';
+                $ngTypes = array_keys($decoded['ng_breakdown']);
+            } else {
+                $type    = 'standard';
+                $ngTypes = [];
             }
+
+            $sectionMeta[$sectionId] = [
+                'type'    => $type,
+                'ngTypes' => $ngTypes,
+            ];
         }
 
         return view('livewire.checksheet.checksheet-report-detail', [
-            'sections'       => $sections,
-            'isWelding'      => $isWelding,
-            'weldingNgTypes' => $weldingNgTypes,
+            'sections'    => $sections,
+            'sectionMeta' => $sectionMeta,
         ])
             ->extends('layouts.app')
             ->section('content');
     }
-
 }

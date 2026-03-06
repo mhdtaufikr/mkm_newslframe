@@ -9,11 +9,11 @@ class HomeIndex extends Component
 {
     public function render()
     {
-        // Ambil checksheet yang active, diurutkan berdasarkan order dan created_at
-        $checksheets = ChecksheetHead::where('is_active', true)
-            ->orderBy('order')
-            ->orderBy('created_at', 'desc')
-            ->get();
+        $checksheets = ChecksheetHead::where('is_active', 1)
+        ->orderBy('order')
+        ->orderBy('id')  // ← tambah fallback sort by id
+        ->get();
+
 
         return view('livewire.home-index', [
             'checksheets' => $checksheets
