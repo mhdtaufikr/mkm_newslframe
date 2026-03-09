@@ -68,9 +68,17 @@
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Serial Number</label>
-                    <input type="text" wire:model.defer="serial_number" readonly
-                           class="w-full px-3 py-2 rounded-lg border border-slate-200 bg-slate-100 text-slate-500 cursor-not-allowed outline-none text-sm font-mono">
+                    <input type="text"
+                           wire:model.defer="serial_number"
+                           placeholder="Masukkan serial number..."
+                           class="w-full px-3 py-2 rounded-lg border
+                                  {{ $checksheet->code === 'PDI-001' ? 'border-slate-200 bg-white text-slate-900 focus:border-slate-500 focus:ring-2 focus:ring-slate-200' : 'border-slate-200 bg-slate-100 text-slate-500 cursor-not-allowed' }}
+                                  transition-all outline-none text-sm font-mono">
+                    @error('serial_number')
+                        <p class="mt-1 text-xs text-red-500 font-semibold">{{ $message }}</p>
+                    @enderror
                 </div>
+
             </div>
         </div>
 
