@@ -66,10 +66,14 @@ class ChecksheetDetail extends Component
             'defaultFormat',
         ])->findOrFail($id);
 
-        $this->sections      = $this->checksheet->sections;
-        $this->tanggal       = date('Y-m-d');
-        $this->nama          = auth()->user()->name;
-        $this->serial_number = $this->generateSerialNumber();
+        $this->sections     = $this->checksheet->sections;
+        $this->tanggal      = date('Y-m-d');
+        $this->nama         = auth()->user()->name;
+
+        // PDI: kosong (manual input), lainnya: auto-generate
+        $this->serial_number = $this->checksheet->code === 'PDI-001'
+            ? ''
+            : $this->generateSerialNumber();
 
         foreach ($this->sections as $section) {
             $this->expandedSections[] = $section->id;
@@ -78,16 +82,16 @@ class ChecksheetDetail extends Component
             $config = $format?->config ?? [];
 
             $this->sectionFormats[$section->id] = [
-                'input_type'      => $config['input_type']     ?? 'standard',
-                'ng_types'        => $config['ng_types']        ?? [],
-                'has_atas_bawah'  => $config['has_atas_bawah']  ?? false,
-                'store_breakdown' => $config['store_breakdown']  ?? false,
-                'repair_types'    => $config['repair_types']     ?? [],
+                'input_type'     => $config['input_type']     ?? 'standard',
+                'ng_types'       => $config['ng_types']       ?? [],
+                'has_atas_bawah' => $config['has_atas_bawah'] ?? false,
+                'store_breakdown'=> $config['store_breakdown'] ?? false,
+                'repair_types'   => $config['repair_types']    ?? [],
             ];
 
-            $ngTypes     = $config['ng_types']    ?? [];
-            $repairTypes = $config['repair_types'] ?? [];
-            $hasRepair   = count($repairTypes) > 0;
+            $ngTypes    = $config['ng_types']   ?? [];
+            $repairTypes= $config['repair_types']?? [];
+            $hasRepair  = count($repairTypes) > 0;
 
             foreach ($section->details as $detail) {
                 if (!empty($ngTypes)) {
@@ -98,12 +102,9 @@ class ChecksheetDetail extends Component
                         $result[$key] = null;
                     }
 
-                    // repair_types = ["YES","NO"] → opsi jawaban, bukan nama kolom
-                    // cukup 1 key 'repair' dengan value null/'yes'/'no'
                     if ($hasRepair) {
                         $result['repair'] = null;
                     }
-
                 } else {
                     $result = ['result' => null, 'status' => ''];
                 }
@@ -112,6 +113,7 @@ class ChecksheetDetail extends Component
             }
         }
     }
+
 
     // ─────────────────────────────────────────────
     // Helper
