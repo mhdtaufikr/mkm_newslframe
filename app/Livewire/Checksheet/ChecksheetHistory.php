@@ -6,6 +6,7 @@ use Livewire\Component;
 use Livewire\WithPagination;
 use App\Models\ChecksheetInspection;
 use App\Models\ChecksheetHead;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 
 class ChecksheetHistory extends Component
@@ -32,24 +33,33 @@ class ChecksheetHistory extends Component
     public function updatingFilterDate() { $this->resetPage(); }
     public function updatingFilterType() { $this->resetPage(); }
 
+    private function selectedYearRange(): array
+    {
+        $year = (int) ($this->filterYear ?: date('Y'));
+        $start = CarbonImmutable::create($year, 1, 1)->startOfDay();
+
+        return [$start, $start->addYear()];
+    }
+
     private function getChartData(): array
     {
-        $year        = $this->filterYear ?: date('Y');
         $checksheets = ChecksheetHead::orderBy('title')->get();
         $months      = range(1, 12);
         $charts      = [];
 
+        [$start, $end] = $this->selectedYearRange();
+        $rowsByChecksheet = ChecksheetInspection::query()
+            ->where('tanggal', '>=', $start->toDateString())
+            ->where('tanggal', '<', $end->toDateString())
+            ->where('total_items', '>', 0)
+            ->selectRaw('checksheet_head_id, MONTH(tanggal) as month, COUNT(*) as total_serial, SUM(CASE WHEN total_ng = 0 THEN 1 ELSE 0 END) as serial_ok')
+            ->groupBy('checksheet_head_id')
+            ->groupByRaw('MONTH(tanggal)')
+            ->get()
+            ->groupBy('checksheet_head_id');
+
         foreach ($checksheets as $cs) {
-            $rows = ChecksheetInspection::where('checksheet_head_id', $cs->id)
-                ->whereYear('tanggal', $year)
-                ->where('total_items', '>', 0)
-                ->selectRaw('
-                    MONTH(tanggal) as month,
-                    COUNT(*) as total_serial,
-                    SUM(CASE WHEN total_ng = 0 THEN 1 ELSE 0 END) as serial_ok
-                ')
-                ->groupByRaw('MONTH(tanggal)')
-                ->get()
+            $rows = $rowsByChecksheet->get($cs->id, collect())
                 ->keyBy('month');
 
             $data    = [];
@@ -88,19 +98,22 @@ class ChecksheetHistory extends Component
 
 private function getNgBreakdownData(): array
 {
-    $year        = $this->filterYear ?: date('Y');
     $checksheets = ChecksheetHead::orderBy('title')->get();
     $result      = [];
 
+    [$start, $end] = $this->selectedYearRange();
+    $rowsByChecksheet = DB::table('checksheet_inspection_results as r')
+        ->join('checksheet_inspections as i', 'r.checksheet_inspection_id', '=', 'i.id')
+        ->where('i.tanggal', '>=', $start->toDateString())
+        ->where('i.tanggal', '<', $end->toDateString())
+        ->whereNotNull('r.result_data')
+        ->where('r.result_data', '!=', '')
+        ->selectRaw('i.checksheet_head_id, MONTH(i.tanggal) as month, r.result_data')
+        ->get()
+        ->groupBy('checksheet_head_id');
+
     foreach ($checksheets as $cs) {
-        $rows = DB::table('checksheet_inspection_results as r')
-            ->join('checksheet_inspections as i', 'r.checksheet_inspection_id', '=', 'i.id')
-            ->where('i.checksheet_head_id', $cs->id)
-            ->whereYear('i.tanggal', $year)
-            ->whereNotNull('r.result_data')
-            ->where('r.result_data', '!=', '')
-            ->selectRaw('MONTH(i.tanggal) as month, r.result_data')
-            ->get();
+        $rows = $rowsByChecksheet->get($cs->id, collect());
 
         if ($rows->isEmpty()) continue;
 
@@ -175,16 +188,19 @@ private function getNgBreakdownData(): array
     {
         $query = ChecksheetInspection::with('checksheetHead')
             ->when($this->search, fn($q) =>
-                $q->where('nama', 'like', "%{$this->search}%")
-                  ->orWhere('serial_number', 'like', "%{$this->search}%")
+                $q->where(fn ($searchQuery) =>
+                    $searchQuery->where('nama', 'like', "%{$this->search}%")
+                        ->orWhere('serial_number', 'like', "%{$this->search}%")
+                )
             )
             ->when($this->filterDate, fn($q) =>
-                $q->whereDate('tanggal', $this->filterDate)
+                $q->where('tanggal', $this->filterDate)
             )
             ->when($this->filterType, fn($q) =>
                 $q->where('checksheet_head_id', $this->filterType)
             )
-            ->orderByDesc('submitted_at');
+            ->orderByDesc('submitted_at')
+            ->orderByDesc('id');
 
         $inspections = $query->paginate(15);
         $chartData   = $this->getChartData();
@@ -215,18 +231,21 @@ private function getNgBreakdownData(): array
 
     public function loadNgDetail(int $checksheetHeadId, string $ngType, ?int $month = null): void
     {
-        $year = $this->filterYear ?: date('Y');
+        [$start, $end] = $this->selectedYearRange();
 
         $query = DB::table('checksheet_inspection_results as r')
             ->join('checksheet_inspections as i', 'r.checksheet_inspection_id', '=', 'i.id')
             ->join('checksheet_details as d', 'r.checksheet_detail_id', '=', 'd.id')
             ->where('i.checksheet_head_id', $checksheetHeadId)
-            ->whereYear('i.tanggal', $year)
+            ->where('i.tanggal', '>=', $start->toDateString())
+            ->where('i.tanggal', '<', $end->toDateString())
             ->whereNotNull('r.result_data')
             ->where('r.result_data', '!=', '');
 
         if ($month) {
-            $query->whereMonth('i.tanggal', $month);
+            $monthStart = $start->addMonths($month - 1);
+            $query->where('i.tanggal', '>=', $monthStart->toDateString())
+                ->where('i.tanggal', '<', $monthStart->addMonth()->toDateString());
         }
 
         $results = $query->select(
@@ -275,7 +294,7 @@ public function closeModal(): void
 
 private function getUnitSummaryData(): array
 {
-    $year = $this->filterYear ?: date('Y');
+    [$start, $end] = $this->selectedYearRange();
 
     $groups = [
         'overall'     => [1, 2, 3, 4],
@@ -286,49 +305,29 @@ private function getUnitSummaryData(): array
     $result = [];
 
     foreach ($groups as $groupKey => $csIds) {
-        $monthly = [];
+        $monthly = array_fill(1, 12, null);
         $requiredCount = count($csIds);
 
-        for ($m = 1; $m <= 12; $m++) {
+        $completeUnits = ChecksheetInspection::query()
+            ->whereIn('checksheet_head_id', $csIds)
+            ->where('tanggal', '>=', $start->toDateString())
+            ->where('tanggal', '<', $end->toDateString())
+            ->whereNotNull('serial_number')
+            ->where('serial_number', '!=', '')
+            ->selectRaw('MONTH(tanggal) as month, serial_number, COUNT(DISTINCT checksheet_head_id) as cs_count, MAX(CASE WHEN total_ng > 0 THEN 1 ELSE 0 END) as has_ng')
+            ->groupByRaw('MONTH(tanggal), serial_number')
+            ->havingRaw('COUNT(DISTINCT checksheet_head_id) = ?', [$requiredCount])
+            ->get()
+            ->groupBy('month');
 
-            // Ambil serial number yang SUDAH ADA di SEMUA checksheet dalam group
-            // Caranya: group by serial_number, hitung distinct checksheet_head_id
-            // Jika count == jumlah checksheet dalam group → serial sudah lengkap
-            $completeSerials = ChecksheetInspection::whereIn('checksheet_head_id', $csIds)
-                ->whereYear('tanggal', $year)
-                ->whereMonth('tanggal', $m)
-                ->whereNotNull('serial_number')
-                ->where('serial_number', '!=', '')
-                ->selectRaw('serial_number, COUNT(DISTINCT checksheet_head_id) as cs_count')
-                ->groupBy('serial_number')
-                ->having('cs_count', '=', $requiredCount)
-                ->pluck('serial_number')
-                ->toArray();
+        foreach ($completeUnits as $month => $units) {
+            $totalUnits = $units->count();
+            $ngUnits = $units->where('has_ng', 1)->count();
 
-            if (empty($completeSerials)) {
-                $monthly[$m] = null;
-                continue;
-            }
-
-            $totalUnits = count($completeSerials);
-            $okUnits    = 0;
-
-            foreach ($completeSerials as $serial) {
-                // Cek semua inspeksi untuk serial ini di bulan ini → harus semua total_ng = 0
-                $allOk = ChecksheetInspection::whereIn('checksheet_head_id', $csIds)
-                    ->whereYear('tanggal', $year)
-                    ->whereMonth('tanggal', $m)
-                    ->where('serial_number', $serial)
-                    ->where('total_ng', '>', 0)
-                    ->doesntExist(); // ✅ true jika tidak ada satupun yang NG
-
-                if ($allOk) $okUnits++;
-            }
-
-            $monthly[$m] = [
+            $monthly[(int) $month] = [
                 'total' => $totalUnits,
-                'ok'    => $okUnits,
-                'ng'    => $totalUnits - $okUnits,
+                'ok'    => $totalUnits - $ngUnits,
+                'ng'    => $ngUnits,
             ];
         }
 

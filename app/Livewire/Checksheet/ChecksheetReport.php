@@ -6,6 +6,7 @@ use Livewire\Component;
 use Livewire\WithPagination;
 use App\Models\ChecksheetInspection;
 use App\Models\ChecksheetHead;
+use Carbon\CarbonImmutable;
 
 class ChecksheetReport extends Component
 {
@@ -40,24 +41,43 @@ class ChecksheetReport extends Component
                 $query->where('status', $this->filterStatus);
             })
             ->when($this->filterDateFrom, function($query) {
-                $query->whereDate('tanggal', '>=', $this->filterDateFrom);
+                $query->where('tanggal', '>=', $this->filterDateFrom);
             })
             ->when($this->filterDateTo, function($query) {
-                $query->whereDate('tanggal', '<=', $this->filterDateTo);
+                $query->where('tanggal', '<=', $this->filterDateTo);
             })
-            ->orderBy('created_at', 'desc')
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
             ->paginate(10);
 
         $checksheetHeads = ChecksheetHead::where('is_active', true)->get();
 
-        // Stats - hitung sebelum paginate
+        $todayStart = CarbonImmutable::today();
+        $tomorrowStart = $todayStart->addDay();
+        $monthStart = $todayStart->startOfMonth();
+        $nextMonthStart = $monthStart->addMonth();
+
+        $statRow = ChecksheetInspection::query()
+            ->selectRaw(
+                'COUNT(*) as total,
+                 SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as completed,
+                 SUM(CASE WHEN created_at >= ? AND created_at < ? THEN 1 ELSE 0 END) as today,
+                 SUM(CASE WHEN created_at >= ? AND created_at < ? THEN 1 ELSE 0 END) as this_month',
+                [
+                    'completed',
+                    $todayStart,
+                    $tomorrowStart,
+                    $monthStart,
+                    $nextMonthStart,
+                ]
+            )
+            ->first();
+
         $stats = [
-            'total' => ChecksheetInspection::count(),
-            'completed' => ChecksheetInspection::where('status', 'completed')->count(),
-            'today' => ChecksheetInspection::whereDate('created_at', today())->count(),
-            'this_month' => ChecksheetInspection::whereMonth('created_at', now()->month)
-                                                 ->whereYear('created_at', now()->year)
-                                                 ->count(),
+            'total' => (int) $statRow->total,
+            'completed' => (int) $statRow->completed,
+            'today' => (int) $statRow->today,
+            'this_month' => (int) $statRow->this_month,
         ];
 
         return view('livewire.checksheet.checksheet-report', [
