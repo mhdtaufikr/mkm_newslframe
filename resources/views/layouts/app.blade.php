@@ -22,12 +22,12 @@
 
     {{-- ✅ Livewire styles (include Alpine internally) --}}
     @livewireStyles
+    @vite('resources/css/app.css')
 
     {{-- ❌ REMOVED: Alpine CDN manual (conflict dengan Livewire's Alpine) --}}
     {{-- <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script> --}}
     {{-- <script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/collapse@3.x.x/dist/cdn.min.js"></script> --}}
 
-    <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
