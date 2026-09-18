@@ -80,6 +80,8 @@ class ChecksheetDetail extends Component
             : $this->generateSerialNumber();
 
         foreach ($this->sections as $section) {
+            $this->expandedSections[] = $section->id;
+
             $format = $section->resolvedFormat();
             $config = $format?->config ?? [];
 
