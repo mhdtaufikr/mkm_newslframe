@@ -35,11 +35,15 @@ class ChecksheetDetail extends Component
         $starting  = Rule::where('rule_name', 'starting_serial_no')->value('rule_value');
         $candidate = $starting ?? '1000';
 
-        while (
-            ChecksheetInspection::where('checksheet_head_id', $this->checksheet->id)
-                ->where('serial_number', $candidate)
-                ->exists()
-        ) {
+        $usedSerials = ChecksheetInspection::query()
+            ->where('checksheet_head_id', $this->checksheet->id)
+            ->whereNotNull('serial_number')
+            ->pluck('serial_number')
+            ->all();
+
+        $usedSerials = array_fill_keys($usedSerials, true);
+
+        while (isset($usedSerials[$candidate])) {
             $candidate = $this->incrementSerial($candidate);
         }
 
@@ -76,8 +80,6 @@ class ChecksheetDetail extends Component
             : $this->generateSerialNumber();
 
         foreach ($this->sections as $section) {
-            $this->expandedSections[] = $section->id;
-
             $format = $section->resolvedFormat();
             $config = $format?->config ?? [];
 
