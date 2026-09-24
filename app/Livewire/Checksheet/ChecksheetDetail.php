@@ -147,6 +147,37 @@ class ChecksheetDetail extends Component
         }
     }
 
+    /** Mark every item in one section as OK without changing its remarks. */
+    public function markSectionAsOk(int $sectionId): void
+    {
+        $section = $this->sections->firstWhere('id', $sectionId);
+
+        if (!$section) {
+            return;
+        }
+
+        $config  = $this->getSectionConfig($sectionId);
+        $ngTypes = $config['ng_types'];
+
+        foreach ($section->details as $detail) {
+            if (empty($ngTypes)) {
+                $this->checkResults[$detail->id]['result'] = 'ok';
+                continue;
+            }
+
+            $this->checkResults[$detail->id]['is_ok'] = true;
+
+            foreach ($ngTypes as $type) {
+                $key = 'ng_' . strtolower(str_replace(' ', '_', $type));
+                $this->checkResults[$detail->id][$key] = null;
+            }
+
+            if (!empty($config['repair_types'])) {
+                $this->checkResults[$detail->id]['repair'] = null;
+            }
+        }
+    }
+
     public function showImage($imagePath): void
     {
         $this->selectedImage  = $imagePath;

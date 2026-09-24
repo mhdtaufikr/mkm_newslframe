@@ -130,6 +130,15 @@
                                 </div>
                             </div>
                             <div class="flex items-center gap-3">
+                                <button type="button"
+                                        wire:click.stop="markSectionAsOk({{ $section->id }})"
+                                        title="Tandai semua item dalam section ini sebagai OK"
+                                        class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-green-600 text-white hover:bg-green-700 text-xs font-bold transition-colors shadow-sm">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                                    </svg>
+                                    Bulk OK
+                                </button>
                                 @if($isWelding)
                                     <span class="text-xs font-bold px-2 py-1 rounded-lg bg-blue-100 text-blue-700">
                                         🔧 Welding
@@ -155,6 +164,14 @@
                     </div>
 
                     @if(in_array($section->id, $expandedSections))
+
+                        <div class="mx-4 mt-3 flex items-start gap-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-800">
+                            <svg class="mt-0.5 h-4 w-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 15.75h.007v.008H12v-.008Z" />
+                            </svg>
+                            <p><span class="font-bold">Gunakan Bulk OK</span> untuk menandai semua item pada section ini sudah OK. Periksa item terlebih dahulu; untuk temuan NG, pilih NG per item setelahnya.</p>
+                        </div>
 
                         {{-- Section Image & Description --}}
                         @if($section->section_images || $section->section_description)
